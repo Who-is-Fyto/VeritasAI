@@ -1,0 +1,35 @@
+# ── Web framework ──────────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# ── Data validation ────────────────────────────────────────────────────────
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# ── Database (async MongoDB driver) ───────────────────────────────────────
+motor==3.6.0
+pymongo==4.9.2
+
+# ── AI / NLP ───────────────────────────────────────────────────────────────
+transformers==4.47.1          # HuggingFace Transformers (RoBERTa)
+torch==2.5.1                  # PyTorch — CPU-only install by default
+# For GPU support, replace torch above with the appropriate CUDA wheel from:
+# https://pytorch.org/get-started/locally/
+
+# ── HTTP client (News API + URL fetching) ─────────────────────────────────
+httpx==0.28.1
+newspaper3k==0.2.8            # Article scraping from URLs
+lxml[html_clean]==5.3.0       # Required by newspaper3k
+
+# ── Security & utilities ───────────────────────────────────────────────────
+python-dotenv==1.0.1
+python-multipart==0.0.20      # File upload support
+slowapi==0.1.9                # Rate limiting
+PyJWT==2.10.1                 # JWT token generation
+bcrypt==4.2.0                 # Password hashing
+
+
+# ── Testing ────────────────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx                         # Used by TestClient

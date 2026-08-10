@@ -1,0 +1,85 @@
+# ── VeritasAI — Full Stack Docker Compose ─────────────────────────────────
+# Runs three services:
+#   frontend  — Vite dev server  (port 5173)
+#   backend   — FastAPI/Uvicorn  (port 8000)
+#   mongo     — MongoDB 7        (port 27017)
+#
+# Usage:
+#   docker compose up --build          # start everything
+#   docker compose up backend mongo    # backend + DB only (use local frontend)
+#   docker compose down -v             # stop and remove volumes
+
+version: "3.9"
+
+services:
+
+  # ── MongoDB ─────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: veritas_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: veritasai
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: veritas_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override the MongoDB URI to use the Docker service name
+      MONGODB_URI: mongodb://mongo:27017
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      # Mount model checkpoints without rebuilding the image
+      - ./backend/models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 180s
+
+
+
+  # ── React Frontend (dev server) ──────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: veritas_frontend
+    working_dir: /app
+    command: sh -c "npm install -g pnpm && pnpm install && pnpm dev --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source so hot-reload works inside the container
+      - .:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: ""           # Empty = use Vite proxy (/api → backend:8000)
+      VITE_USE_MOCK_API: "false" # Use the real backend
+      VITE_PROXY_TARGET: "http://backend:8000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+
+volumes:
+  mongo_data:
+    driver: local

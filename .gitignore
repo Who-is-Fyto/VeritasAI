@@ -1,0 +1,58 @@
+# ── Node / Frontend Dependencies & Builds ──────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnpm-home/
+dist/
+dist-ssr/
+*.local
+
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Python / Backend Environments & Caches ─────────────────────────────────
+venv/
+.venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+backend/.env
+
+# ── Large Model Checkpoints (Deep Learning Binaries) ──────────────────────
+backend/models/
+backend/app/models/
+backend/roberta-base/
+*.pt
+*.bin
+*.pkl
+*.h5
+*.safetensors
+*.onnx
+*.msgpack
+*.ot
+
+
+# ── MongoDB Local Dumps & Storage Data ─────────────────────────────────────
+data/
+data/db/
+
+# ── OS & IDE Settings ──────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

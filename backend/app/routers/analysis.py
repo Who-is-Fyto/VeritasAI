@@ -1,0 +1,220 @@
+"""
+Analysis router
+───────────────
+POST /api/v1/analyse  — submit content, run the three-service pipeline,
+                        persist to MongoDB, return AnalysisResult.
+
+GET  /api/v1/results/:id — retrieve a stored result by its document ID.
+"""
+import logging
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel
+
+
+from app.config import settings
+from app.db.mongodb import get_db
+from app.schemas.request import AnalyseRequest
+from app.schemas.response import AnalysisResult, WeightedScores
+from app.services.linguistic import linguistic_service
+from app.services.source import source_service
+from app.services.corroboration import corroboration_service
+
+from app.utils.security import is_safe_url, sanitize_text
+from app.routers.auth import get_user_or_api_key
+
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/v1", tags=["analysis"])
+
+
+# ── Helper: compute weighted ensemble score ──────────────────────────────
+def compute_overall_score(
+    linguistic: float, source: float, corroboration: float
+) -> float:
+    return round(
+        linguistic    * settings.weight_linguistic +
+        source        * settings.weight_source +
+        corroboration * settings.weight_corroboration,
+        1,
+    )
+
+
+# ── POST /api/v1/analyse ─────────────────────────────────────────────────
+@router.post(
+    "/analyse",
+    response_model=AnalysisResult,
+    status_code=status.HTTP_200_OK,
+    summary="Submit content for credibility analysis",
+)
+async def analyse(
+    body: AnalyseRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: object = Depends(get_user_or_api_key)
+) -> AnalysisResult:
+
+    """
+    Orchestrates the three analysis services in parallel, computes the
+    weighted Credibility Index, persists the result, and returns it.
+    """
+    import asyncio
+
+    doc_id = str(uuid.uuid4())
+    logger.info("Starting analysis %s — type=%s length=%d", doc_id, body.type, len(body.content))
+
+    # ── Scrape URL if needed ────────────────────────────────────────────
+    content_to_analyse = body.content
+    if body.type == "url":
+        # 1. Enforce SSRF protection check
+        if not is_safe_url(body.content):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Access denied: The submitted URL is invalid, unsafe, or references a local address."
+            )
+
+        try:
+            from newspaper import Article, Config
+            # 2. Configure strict download constraints
+            cfg = Config()
+            cfg.request_timeout = 5               # 5 seconds max timeout
+            cfg.MAX_FILE_SIZE = 2 * 1024 * 1024   # 2MB max file size to prevent zip bombs/giant dumps
+            cfg.number_of_threads = 1
+            cfg.browser_user_agent = "VeritasAI Credibility Scanner/1.0"
+
+            # Run blocking scrape in a thread to keep FastAPI event loop async
+            article = Article(body.content, config=cfg)
+            article.download()
+            article.parse()
+            content_to_analyse = article.text
+            if not content_to_analyse or len(content_to_analyse.strip()) < 10:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Could not extract text from the provided URL. The page might be empty or protected."
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Failed to scrape URL %s: %s", body.content, e)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Failed to scrape URL: {str(e)}"
+            )
+
+    # 3. Sanitise input text (XSS protection)
+    content_to_analyse = sanitize_text(content_to_analyse)
+
+
+    # ── Run all three services concurrently ──────────────────────────────
+    linguistic_task     = linguistic_service.analyse(content_to_analyse)
+    source_task         = source_service.analyse(body.content, body.type)
+    corroboration_task  = corroboration_service.analyse(content_to_analyse)
+
+    linguistic_result, source_result, corroboration_result = await asyncio.gather(
+        linguistic_task, source_task, corroboration_task
+    )
+
+    # ── Compute overall score ────────────────────────────────────────────
+    overall = compute_overall_score(
+        linguistic_result.score,
+        source_result.score,
+        corroboration_result.score,
+    )
+
+    result = AnalysisResult(
+        id=doc_id,
+        status="complete",
+        input_type=body.type,
+        submitted_at=datetime.utcnow(),
+        overall_score=overall,
+        ai_probability=linguistic_result.ai_probability,
+        scores=WeightedScores(
+            linguistic_score=linguistic_result.score,
+            source_score=source_result.score,
+            corroboration_score=corroboration_result.score,
+            weights={
+                "linguistic": settings.weight_linguistic,
+                "source": settings.weight_source,
+                "corroboration": settings.weight_corroboration,
+            },
+        ),
+        xai_annotations=linguistic_result.xai_annotations,
+        sources=source_result.sources,
+        claims=corroboration_result.claims,
+        linguistic_flags=linguistic_result.flags,
+        summary=_build_summary(overall),
+        content=content_to_analyse,
+    )
+
+
+    # ── Persist to MongoDB ───────────────────────────────────────────────
+    # result.model_dump() converts Pydantic model → plain dict for Motor
+    await db["results"].insert_one({"_id": doc_id, **result.model_dump()})
+    logger.info("Analysis %s persisted — overall_score=%.1f", doc_id, overall)
+
+    return result
+
+
+# ── GET /api/v1/results/:id ──────────────────────────────────────────────
+@router.get(
+    "/results/{result_id}",
+    response_model=AnalysisResult,
+    summary="Retrieve a stored analysis result",
+)
+async def get_result(
+    result_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> AnalysisResult:
+    doc = await db["results"].find_one({"_id": result_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Result '{result_id}' not found.")
+    doc.pop("_id", None)
+    return AnalysisResult(**doc)
+
+
+class FeedbackRequest(BaseModel):
+    is_accurate: bool
+    corrected_label: str  # "credible" or "misinformation"
+    corrected_score: float | None = None
+
+
+@router.post(
+    "/results/{result_id}/feedback",
+    summary="Submit user feedback on analysis accuracy for active learning",
+)
+async def submit_feedback(
+    result_id: str,
+    body: FeedbackRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    doc = await db["results"].find_one({"_id": result_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Result '{result_id}' not found.")
+
+    feedback_doc = {
+        "is_accurate": body.is_accurate,
+        "corrected_label": body.corrected_label,
+        "corrected_score": body.corrected_score,
+        "submitted_at": datetime.utcnow()
+    }
+
+    await db["results"].update_one(
+        {"_id": result_id},
+        {"$set": {"feedback": feedback_doc}}
+    )
+    logger.info("User feedback recorded for result %s: corrected_label=%s", result_id, body.corrected_label)
+    return {"status": "success", "message": "Feedback recorded successfully."}
+
+
+
+# ── Private helpers ──────────────────────────────────────────────────────
+def _build_summary(score: float) -> str:
+    if score >= 80:
+        return "Content is highly credible. Claims are well-supported and the source is authoritative."
+    if score >= 60:
+        return "Content is moderately credible. Some claims verified; minor linguistic concerns noted."
+    if score >= 40:
+        return "Content has low credibility. Several unverified claims and potential manipulation markers detected."
+    return "Content is highly suspect. Multiple manipulation markers and unverifiable claims identified."

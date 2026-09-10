@@ -187,6 +187,16 @@ export const veritasAPI = {
     request("/api/v1/auth/me"),
 
   /**
+   * PUT /api/v1/auth/profile
+   * Update active user account profile.
+   */
+  updateProfile: (payload: { name?: string; institution?: string; role?: string; student_id?: string }): Promise<any> =>
+    request("/api/v1/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  /**
    * POST /api/v1/results/:id/feedback
    * Submit user feedback on analysis accuracy for active learning.
    */

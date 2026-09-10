@@ -4,10 +4,11 @@
 #   backend   — FastAPI/Uvicorn  (port 8000)
 #   mongo     — MongoDB 7        (port 27017)
 #
-# Usage:
-#   docker compose up --build          # start everything
-#   docker compose up backend mongo    # backend + DB only (use local frontend)
-#   docker compose down -v             # stop and remove volumes
+# Usage (on this system use docker-compose with hyphen):
+#   docker-compose up                  # start everything with live hot-reloading!
+#   docker-compose up --build          # only needed when dependencies change
+#   docker-compose up backend mongo    # backend + DB only
+#   docker-compose down                # stop all containers
 
 version: "3.9"
 
@@ -48,8 +49,13 @@ services:
       mongo:
         condition: service_healthy
     volumes:
+      # Live code bind mount: edits to local Python files reflect inside container in real-time
+      - ./backend/app:/app/app
+      - ./backend/main.py:/app/main.py
       # Mount model checkpoints without rebuilding the image
       - ./backend/models:/app/models:ro
+    # Run uvicorn with --reload so it reloads automatically whenever Python files are modified
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 20s
@@ -75,6 +81,8 @@ services:
       VITE_API_URL: ""           # Empty = use Vite proxy (/api → backend:8000)
       VITE_USE_MOCK_API: "false" # Use the real backend
       VITE_PROXY_TARGET: "http://backend:8000"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
     depends_on:
       backend:
         condition: service_healthy

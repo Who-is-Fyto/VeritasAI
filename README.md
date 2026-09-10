@@ -702,7 +702,31 @@ Allows developers and researchers to query the credibility engine programmatical
 ### 5. Active Learning & Self-Training Pipeline
 An asynchronous background task fine-tunes RoBERTa classification weights (or fallbacks) every 2 weeks using gathered feedback. Built-in concurrency locks prevent race conditions during training.
 
+### 6. Multi-Source Corroboration & Stance Detection
+Cross-references claims across Google Fact Check Tools API (certified fact-checkers), live News API with entity query fallback, Google Custom Search (CSE), and the Wikipedia Knowledge Engine. Detects refutation markers to classify debunked viral claims accurately as `false` rather than misclassifying them as verified.
+
+### 7. Comprehensive Source Registry & Anti-Spoofing
+Registry of 100+ global, South African, and African publishers, certified fact-checkers, and questionable domains. Enforces journalistic attribution framing to prevent source authority spoofing via incidental name-dropping.
+
+---
+
+## Technical Documentation
+
+Detailed, easy-to-understand technical guides for all subsystems are available in the [`docs/`](./docs) directory:
+
+- [Fact-Checking & Corroboration Engine Upgrade](./docs/CORROBORATION_ENGINE_UPGRADE.md) — Multi-source pipeline, query construction, and debunking stance detection.
+- [Source Authority Registry & Anti-Spoofing Engine](./docs/SOURCE_AUTHORITY_DATABASE.md) — 100+ publisher registry, attribution checks, and dynamic domain probing.
+- [Authentication, Concurrency & Caching Architecture](./docs/AUTHENTICATION_AND_CONCURRENCY.md) — Guest access, async scraping thread offloading, and SHA-256 analysis caching.
+- [Linguistic Analysis & AI Text Detection](./docs/LINGUISTIC_AND_AI_DETECTION.md) — Sentence-level XAI, attribution precedence, and Shannon entropy AI detection.
+- [Cyber Security: SSRF & Input Sanitisation](./docs/SSRF_AND_INPUT_SECURITY.md) — Subnet filtering, DNS resolution checks, and XSS prevention.
+- [API Key Management System](./docs/API_KEY_MANAGEMENT.md) — SHA-256 developer key generation and authentication headers.
+- [Active Learning & Continuous Retraining](./docs/ACTIVE_LEARNING_PIPELINE.md) — Feedback loop, data curation, and model re-tuning.
+- [Interactive Corroboration Graph Visualization](./docs/GRAPH_VISUALIZATION.md) — Dynamic SVG claim-to-source mapping.
+- [Machine Learning Training Pipeline](./docs/ML_PIPELINE.md) — RoBERTa fine-tuning on the LIAR dataset.
+
 ---
 
 *VeritasAI — Beyond fact-checking. A Credibility Index.*
+*BSc IT Dissertation — Michael Mazhambe (402100810)*
+
 

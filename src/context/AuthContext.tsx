@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { veritasAPI } from "../services/api";
+import { resolveAffiliation } from "../utils/affiliation";
 
-interface User {
+export interface User {
   id: string;
   email: string;
   name: string;
   joined_at: string;
+  role?: string;
+  institution?: string;
+  student_id?: string;
+  account_type?: "academic" | "enterprise" | "base";
 }
 
 interface AuthContextType {
@@ -15,6 +20,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   login: (credentials: any) => Promise<void>;
   register: (payload: any) => Promise<void>;
+  updateProfile: (payload: any) => Promise<void>;
   logout: () => void;
 }
 
@@ -60,11 +66,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (credentials: any) => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
-      const mockUser = {
+      const aff = resolveAffiliation(credentials.email);
+      const mockUser: User = {
         id: "mock-user-123",
         email: credentials.email,
         name: credentials.email.split("@")[0],
-        joined_at: new Date().toISOString()
+        joined_at: new Date().toISOString(),
+        institution: aff.institution,
+        role: aff.role,
+        student_id: aff.studentId || undefined,
+        account_type: aff.accountType,
       };
       setToken("mock-token-abc");
       setUser(mockUser);
@@ -88,11 +99,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (payload: any) => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
-      const mockUser = {
+      const aff = resolveAffiliation(payload.email);
+      const mockUser: User = {
         id: "mock-user-123",
         email: payload.email,
         name: payload.name,
-        joined_at: new Date().toISOString()
+        joined_at: new Date().toISOString(),
+        institution: payload.institution || aff.institution,
+        role: payload.role || aff.role,
+        student_id: payload.student_id || aff.studentId || undefined,
+        account_type: aff.accountType,
       };
       setToken("mock-token-abc");
       setUser(mockUser);
@@ -113,6 +129,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (payload: any) => {
+    if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const updated: User = {
+        ...(user || {
+          id: "mock-user-123",
+          email: "user@example.com",
+          name: "User",
+          joined_at: new Date().toISOString(),
+        }),
+        ...payload,
+      };
+      setUser(updated);
+      localStorage.setItem("veritas_user", JSON.stringify(updated));
+      return;
+    }
+
+    const updatedUser = await veritasAPI.updateProfile(payload);
+    setUser(updatedUser);
+    localStorage.setItem("veritas_user", JSON.stringify(updatedUser));
+  };
 
   const logout = () => {
     setToken(null);
@@ -130,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn: !!token,
         login,
         register,
+        updateProfile,
         logout,
       }}
     >

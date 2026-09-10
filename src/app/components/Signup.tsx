@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { resolveAffiliation } from "../../utils/affiliation";
 import { User, Mail, Key, AlertCircle, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -102,10 +103,24 @@ export function Signup() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@student.richfield.ac.za"
+                placeholder="you@student.richfield.ac.za or you@company.com"
                 className="w-full pl-10 pr-4 py-3 bg-blue-50/20 border border-blue-200/50 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm outline-none transition-all"
               />
             </div>
+            {email.includes("@") && email.split("@")[1]?.length >= 3 && (
+              (() => {
+                const preview = resolveAffiliation(email);
+                return (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground text-[11px]">Detected:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${preview.badgeColor}`}>
+                      {preview.badgeLabel}
+                    </span>
+                    <span className="text-gray-700 font-medium text-[11px] truncate">{preview.institution}</span>
+                  </div>
+                );
+              })()
+            )}
           </div>
 
           {/* Password */}

@@ -35,6 +35,8 @@ export default defineConfig({
     port: 5173,
     watch: {
       ignored: ['**/backend/**'],
+      usePolling: true,
+      interval: 100,
     },
     proxy: {
       '/api': {

@@ -2,7 +2,7 @@
 Response schemas — mirror the TypeScript types in src/types/analysis.ts.
 Any change here must be reflected in the frontend types file.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field
@@ -36,6 +36,7 @@ class CorroboratingSource(BaseModel):
     url: str
     publisher: Optional[str] = None
     similarity_score: Optional[float] = None
+    snippet: Optional[str] = None
 
 
 class ClaimResult(BaseModel):
@@ -65,7 +66,7 @@ class AnalysisResult(BaseModel):
     id: str
     status: str = "complete"
     input_type: str
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     overall_score: float   = Field(..., ge=0, le=100)
     ai_probability: float  = Field(..., ge=0, le=100)
     scores: WeightedScores

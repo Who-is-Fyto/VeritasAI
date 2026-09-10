@@ -9,7 +9,7 @@ import os
 import json
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -86,14 +86,14 @@ class TrainerService:
                 linguistic_service.__init__()
                 
                 training_status["status"] = "completed"
-                training_status["last_run"] = datetime.utcnow().isoformat()
+                training_status["last_run"] = datetime.now(timezone.utc).isoformat()
                 logger.info("VeritasAI self-training completed successfully.")
                 
             except Exception as e:
                 logger.exception("Self-training failed")
                 training_status["status"] = "failed"
                 training_status["error_message"] = str(e)
-                training_status["last_run"] = datetime.utcnow().isoformat()
+                training_status["last_run"] = datetime.now(timezone.utc).isoformat()
 
     def _get_bootstrap_samples(self) -> list[dict]:
         """Standard mock dataset for training bootstrapping."""

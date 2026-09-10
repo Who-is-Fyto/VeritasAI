@@ -5,11 +5,12 @@ POST /api/v1/auth/login
 GET  /api/v1/auth/me
 """
 import uuid
+import re
 import jwt
 import bcrypt
 import logging
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
@@ -19,15 +20,30 @@ from app.config import settings
 from app.db.mongodb import get_db
 from app.schemas.auth import (
     UserRegister, UserLogin, UserResponse, TokenResponse,
-    APIKeyCreate, APIKeyResponse, APIKeyGeneratedResponse
+    APIKeyCreate, APIKeyResponse, APIKeyGeneratedResponse,
+    UserProfileUpdate
 )
-
+from app.services.affiliation import resolve_user_affiliation
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+
+def build_user_response(user_doc: dict) -> UserResponse:
+    aff = resolve_user_affiliation(user_doc.get("email", ""), user_doc)
+    return UserResponse(
+        id=user_doc["_id"],
+        email=user_doc["email"],
+        name=user_doc.get("name", "User"),
+        joined_at=user_doc["joined_at"],
+        role=user_doc.get("role") or aff["role"],
+        institution=user_doc.get("institution") or aff["institution"],
+        student_id=user_doc.get("student_id") or aff["student_id"],
+        account_type=user_doc.get("account_type") or aff["account_type"],
+    )
 
 
 # ── Password hashing and verification helpers ────────────────────────────
@@ -46,11 +62,12 @@ def get_password_hash(password: str) -> str:
 
 # ── JWT token generation and validation helpers ─────────────────────────
 def create_access_token(user_id: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_expire_minutes)
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=settings.jwt_expire_minutes)
     payload = {
         "sub": user_id,
         "exp": expire,
-        "iat": datetime.utcnow()
+        "iat": now
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
@@ -91,12 +108,50 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return UserResponse(
-        id=user_doc["_id"],
-        email=user_doc["email"],
-        name=user_doc["name"],
-        joined_at=user_doc["joined_at"]
-    )
+    return build_user_response(user_doc)
+
+
+async def get_optional_user_or_api_key(
+    token: str | None = Depends(oauth2_scheme),
+    x_veritas_api_key: str | None = Header(None, alias="X-Veritas-API-Key"),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> UserResponse | None:
+    """
+    Validates either a Bearer JWT or an X-Veritas-API-Key header if provided.
+    Returns UserResponse if authenticated, or None if neither credential was provided (guest mode).
+    Raises HTTPException(401) if invalid or revoked credentials are provided.
+    """
+    if not token and not x_veritas_api_key:
+        return None
+
+    # 1. Bearer token provided
+    if token:
+        try:
+            return await get_current_user(token, db)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Token validation failed: {str(e)}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    # 2. API Key header provided
+    if x_veritas_api_key:
+        hashed_key = hashlib.sha256(x_veritas_api_key.encode("utf-8")).hexdigest()
+        key_doc = await db["api_keys"].find_one({"hashed_key": hashed_key})
+        if key_doc:
+            user_doc = await db["users"].find_one({"_id": key_doc["user_id"]})
+            if user_doc:
+                return build_user_response(user_doc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked API key.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return None
 
 
 async def get_user_or_api_key(
@@ -104,32 +159,15 @@ async def get_user_or_api_key(
     x_veritas_api_key: str | None = Header(None, alias="X-Veritas-API-Key"),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> UserResponse:
-    # 1. Try token first
-    if token:
-        try:
-            return await get_current_user(token, db)
-        except Exception:
-            pass
-
-    # 2. Try API key
-    if x_veritas_api_key:
-        hashed_key = hashlib.sha256(x_veritas_api_key.encode("utf-8")).hexdigest()
-        key_doc = await db["api_keys"].find_one({"hashed_key": hashed_key})
-        if key_doc:
-            user_doc = await db["users"].find_one({"_id": key_doc["user_id"]})
-            if user_doc:
-                return UserResponse(
-                    id=user_doc["_id"],
-                    email=user_doc["email"],
-                    name=user_doc["name"],
-                    joined_at=user_doc["joined_at"]
-                )
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated. Provide a valid Bearer token or X-Veritas-API-Key header.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    """Strict authentication dependency: requires valid Bearer token or API key."""
+    user = await get_optional_user_or_api_key(token, x_veritas_api_key, db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Provide a valid Bearer token or X-Veritas-API-Key header.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 
 
@@ -144,8 +182,9 @@ async def register(
     body: UserRegister,
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> TokenResponse:
-    # 1. Check if user already exists
-    existing_user = await db["users"].find_one({"email": body.email})
+    # 1. Check if user already exists (case-insensitive & trimmed)
+    clean_email = body.email.strip().lower()
+    existing_user = await db["users"].find_one({"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}})
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -155,13 +194,18 @@ async def register(
     # 2. Hash password and save user
     user_id = str(uuid.uuid4())
     hashed_password = get_password_hash(body.password)
-    joined_time = datetime.utcnow()
+    joined_time = datetime.now(timezone.utc)
 
+    aff = resolve_user_affiliation(clean_email)
     user_doc = {
         "_id": user_id,
-        "email": body.email,
+        "email": clean_email,
         "password": hashed_password,
-        "name": body.name,
+        "name": body.name.strip(),
+        "institution": body.institution.strip() if body.institution else aff["institution"],
+        "role": body.role.strip() if body.role else aff["role"],
+        "student_id": body.student_id.strip() if body.student_id else aff["student_id"],
+        "account_type": aff["account_type"],
         "joined_at": joined_time
     }
     await db["users"].insert_one(user_doc)
@@ -169,12 +213,7 @@ async def register(
 
     # 3. Issue token
     token = create_access_token(user_id)
-    user_res = UserResponse(
-        id=user_id,
-        email=body.email,
-        name=body.name,
-        joined_at=joined_time
-    )
+    user_res = build_user_response(user_doc)
     return TokenResponse(access_token=token, user=user_res)
 
 
@@ -189,8 +228,9 @@ async def login(
     body: UserLogin,
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> TokenResponse:
-    # 1. Fetch user by email
-    user_doc = await db["users"].find_one({"email": body.email})
+    # 1. Fetch user by email (case-insensitive & trimmed)
+    clean_email = body.email.strip()
+    user_doc = await db["users"].find_one({"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}})
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -208,12 +248,7 @@ async def login(
 
     # 3. Issue token
     token = create_access_token(user_doc["_id"])
-    user_res = UserResponse(
-        id=user_doc["_id"],
-        email=user_doc["email"],
-        name=user_doc["name"],
-        joined_at=user_doc["joined_at"]
-    )
+    user_res = build_user_response(user_doc)
     return TokenResponse(access_token=token, user=user_res)
 
 
@@ -225,6 +260,34 @@ async def login(
 )
 async def me(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
     return current_user
+
+
+# ── PUT /api/v1/auth/profile ─────────────────────────────────────────────
+@router.put(
+    "/profile",
+    response_model=UserResponse,
+    summary="Update current user account profile"
+)
+async def update_profile(
+    body: UserProfileUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> UserResponse:
+    update_fields = {}
+    if body.name is not None and body.name.strip():
+        update_fields["name"] = body.name.strip()
+    if body.institution is not None:
+        update_fields["institution"] = body.institution.strip()
+    if body.role is not None:
+        update_fields["role"] = body.role.strip()
+    if body.student_id is not None:
+        update_fields["student_id"] = body.student_id.strip()
+
+    if update_fields:
+        await db["users"].update_one({"_id": current_user.id}, {"$set": update_fields})
+
+    updated_doc = await db["users"].find_one({"_id": current_user.id})
+    return build_user_response(updated_doc)
 
 
 # ── API Key Management Endpoints ─────────────────────────────────────────
@@ -243,7 +306,7 @@ async def create_api_key(
     key_prefix = raw_key[:12]  # e.g., "veritas_a1b2..."
     hashed_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     key_id = str(uuid.uuid4())
-    created_time = datetime.utcnow()
+    created_time = datetime.now(timezone.utc)
 
     key_doc = {
         "_id": key_id,

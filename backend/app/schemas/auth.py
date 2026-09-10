@@ -10,6 +10,9 @@ class UserRegister(BaseModel):
     email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=6, max_length=100)
     name: str = Field(..., min_length=2, max_length=100)
+    institution: str | None = None
+    role: str | None = None
+    student_id: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -18,6 +21,13 @@ class UserRegister(BaseModel):
         if not re.match(r"^[^@]+@[^@]+\.[^@]+$", v_clean):
             raise ValueError("Invalid email format")
         return v_clean
+
+
+class UserProfileUpdate(BaseModel):
+    name: str | None = Field(None, min_length=2, max_length=100)
+    institution: str | None = Field(None, max_length=150)
+    role: str | None = Field(None, max_length=100)
+    student_id: str | None = Field(None, max_length=50)
 
 
 class UserLogin(BaseModel):
@@ -35,6 +45,10 @@ class UserResponse(BaseModel):
     email: str
     name: str
     joined_at: datetime
+    role: str = "Base User"
+    institution: str = "Independent / General Public"
+    student_id: str | None = None
+    account_type: str = "base"
 
 
 class TokenResponse(BaseModel):

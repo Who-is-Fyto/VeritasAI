@@ -29,6 +29,7 @@ export interface CorroboratingSource {
   url: string;
   publisher?: string;
   similarity_score?: number;
+  snippet?: string;
 }
 
 /** An individual claim extracted and cross-referenced by the engine */

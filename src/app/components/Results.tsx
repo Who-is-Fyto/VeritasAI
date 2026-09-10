@@ -484,7 +484,7 @@ function CorroborationGraph({ claims, sources }: { claims: any[]; sources: any[]
   claims.forEach((claim, idx) => {
     const id = `claim_${idx}`;
     const y = 50 + (idx + 1) * claimSpacing;
-    const color = claim.status === "verified" ? "#10b981" : "#f59e0b";
+    const color = claim.status === "verified" ? "#10b981" : claim.status === "false" ? "#ef4444" : "#f59e0b";
     
     // Map connections: connects to article, and dynamically to matching sources
     const sourceIdx = idx % sources.length;
@@ -540,6 +540,7 @@ function CorroborationGraph({ claims, sources }: { claims: any[]; sources: any[]
         <div className="flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-600 rounded-full" /> Article</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-green-500 rounded-full" /> Verified</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-red-500 rounded-full" /> Debunked</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-amber-500 rounded-full" /> Unverified</span>
         </div>
       </div>
@@ -958,7 +959,9 @@ export function Results() {
                   <span className="text-sm font-bold text-blue-700">{factCheckScore}%</span>
                 </div>
                 <p className="text-xs text-gray-700 leading-relaxed">
-                  {claims.filter(c => c.status === "verified").length > 0
+                  {claims.filter(c => c.status === "false").length > 0
+                    ? `${claims.filter(c => c.status === "false").length} claim(s) debunked as false by certified fact-checkers.`
+                    : claims.filter(c => c.status === "verified").length > 0
                     ? `${claims.filter(c => c.status === "verified").length} claim(s) verified against press archives with direct news reference links below.`
                     : "Factual statements require additional independent confirmation from primary news sources."}
                 </p>
@@ -1109,72 +1112,148 @@ export function Results() {
 
           <div className={`grid lg:grid-cols-2 gap-6 mb-6 ${corroborationView === "graph" ? "lg:hidden hidden" : ""}`}>
             <div className="bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
-              <div className="flex items-center gap-2 mb-6">
-                <Search className="w-5 h-5 text-blue-600" />
-                <h3>Claim Verification</h3>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Search className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-gray-900">Claim-Check-Evidence Verification</h3>
+                </div>
+                <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  Newsroom Standard
+                </span>
               </div>
-              <div className="space-y-3">
-                {claims.map((claim, i) => (
-                  <div key={i} className="p-4 border border-blue-200/40 rounded-lg hover:border-blue-300 transition-all bg-blue-50/20 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-1.5 rounded-lg flex-shrink-0 clip-corner-icon ${claim.status === "verified" ? "bg-green-100" : "bg-yellow-100"}`}>
-                        {claim.status === "verified"
-                          ? <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          : <AlertTriangle className="w-4 h-4 text-yellow-600" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium mb-1.5 leading-snug text-gray-900">{claim.claim}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
-                          <span className={claim.status === "verified" ? "text-green-600 font-semibold" : "text-yellow-600 font-semibold"}>
-                            {claim.status === "verified" ? "Verified" : "Unverified"}
-                          </span>
-                          <span>·</span>
-                          <span>Confidence {claim.confidence}%</span>
-                          <span>·</span>
-                          <span>{claim.sources} source{claim.sources > 1 ? "s" : ""}</span>
+              <div className="space-y-3.5">
+                {claims.map((claim, i) => {
+                  const isVerified = claim.status === "verified";
+                  const isFalse = claim.status === "false";
+                  const isUnverified = !isVerified && !isFalse;
+
+                  const badgeBg = isVerified
+                    ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    : isFalse
+                    ? "bg-rose-100 text-rose-800 border-rose-300"
+                    : "bg-amber-100 text-amber-800 border-amber-300";
+
+                  const iconBg = isVerified
+                    ? "bg-emerald-100 text-emerald-600"
+                    : isFalse
+                    ? "bg-rose-100 text-rose-600"
+                    : "bg-amber-100 text-amber-600";
+
+                  const borderCard = isVerified
+                    ? "border-emerald-200/70 hover:border-emerald-300 bg-emerald-50/15"
+                    : isFalse
+                    ? "border-rose-200/70 hover:border-rose-300 bg-rose-50/20"
+                    : "border-amber-200/60 hover:border-amber-300 bg-amber-50/15";
+
+                  return (
+                    <div key={i} className={`p-4 border rounded-xl transition-all space-y-3.5 ${borderCard}`}>
+                      {/* Row 1: The Claim + The Check Badge */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${iconBg}`}>
+                            {isVerified ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            ) : isFalse ? (
+                              <XCircle className="w-4 h-4 text-rose-600" />
+                            ) : (
+                              <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">1. The Claim</span>
+                            </div>
+                            <p className="text-sm font-semibold leading-snug text-gray-900">
+                              "{claim.claim}"
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Explanation Box */}
-                        {claim.explanation && (
-                          <div className={`p-2.5 rounded-md text-xs leading-relaxed border ${
-                            claim.status === "verified"
-                              ? "bg-green-50/60 border-green-200/60 text-green-900"
-                              : "bg-amber-50/60 border-amber-200/60 text-amber-900"
-                          }`}>
-                            <span className="font-semibold">Verification Rationale: </span>
-                            {claim.explanation}
-                          </div>
-                        )}
-
-                        {/* Direct Source News Links */}
-                        {claim.source_links && claim.source_links.length > 0 && (
-                          <div className="mt-2.5 pt-2 border-t border-blue-100/60">
-                            <span className="text-xs font-semibold text-gray-700 block mb-1.5">Corroborating Press Links:</span>
-                            <div className="space-y-1.5">
-                              {claim.source_links.map((src, sIdx) => (
-                                <a
-                                  key={sIdx}
-                                  href={src.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center justify-between p-2 rounded bg-white hover:bg-blue-50 border border-blue-200/60 text-xs text-blue-700 transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2 truncate pr-2">
-                                    <span className="font-semibold text-blue-900 px-1.5 py-0.5 bg-blue-100 rounded text-[10px] uppercase">
-                                      {src.publisher || "News"}
-                                    </span>
-                                    <span className="truncate group-hover:underline text-gray-800">{src.title}</span>
-                                  </div>
-                                  <ExternalLink className="w-3.5 h-3.5 text-blue-500 group-hover:text-blue-700 flex-shrink-0" />
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        {/* The Check (Verdict) */}
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border flex items-center gap-1 ${badgeBg}`}>
+                            {isVerified && <CheckCircle2 className="w-3.5 h-3.5" />}
+                            {isFalse && <XCircle className="w-3.5 h-3.5" />}
+                            {isUnverified && <AlertTriangle className="w-3.5 h-3.5" />}
+                            {isVerified ? "Verified True" : isFalse ? "Debunked / False" : "Unverified"}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium mt-1">
+                            {claim.confidence}% confidence
+                          </span>
+                        </div>
                       </div>
+
+                      {/* Row 2: The Check (Assessment & Ruling) */}
+                      {claim.explanation && (
+                        <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
+                          isVerified ? "bg-emerald-50/80 border-emerald-200 text-emerald-950" :
+                          isFalse ? "bg-rose-50/80 border-rose-200 text-rose-950" :
+                          "bg-amber-50/80 border-amber-200 text-amber-950"
+                        }`}>
+                          <div className="flex items-center gap-1.5 mb-1 font-bold text-[11px] uppercase tracking-wider">
+                            <Info className="w-3.5 h-3.5" />
+                            <span>2. The Check (Assessment & Ruling)</span>
+                          </div>
+                          <p className="text-gray-800">{claim.explanation}</p>
+                        </div>
+                      )}
+
+                      {/* Row 3: The Evidence (Direct Links & Excerpts) */}
+                      {claim.source_links && claim.source_links.length > 0 ? (
+                        <div className="pt-2 border-t border-slate-200/80">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                              <span>3. The Evidence ({isFalse ? "Debunking Records" : "Corroborating Press Records"})</span>
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {claim.source_links.length} primary record{claim.source_links.length > 1 ? "s" : ""}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {claim.source_links.map((src, sIdx) => (
+                              <div key={sIdx} className="p-2.5 rounded-lg bg-white border border-slate-200 hover:border-blue-300 transition-colors shadow-sm">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                      isFalse ? "bg-rose-100 text-rose-800" : "bg-blue-100 text-blue-800"
+                                    }`}>
+                                      {src.publisher || "Source"}
+                                    </span>
+                                    <a
+                                      href={src.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs font-semibold text-slate-900 hover:text-blue-600 truncate hover:underline flex items-center gap-1"
+                                    >
+                                      <span className="truncate">{src.title}</span>
+                                      <ExternalLink className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                                    </a>
+                                  </div>
+                                  {src.similarity_score && (
+                                    <span className="text-[10px] font-medium text-slate-500 flex-shrink-0">
+                                      {Math.round(src.similarity_score)}% match
+                                    </span>
+                                  )}
+                                </div>
+                                {src.snippet && (
+                                  <p className="text-[11px] text-slate-600 mt-1.5 line-clamp-2 leading-relaxed italic bg-slate-50 p-1.5 rounded border border-slate-100">
+                                    "{src.snippet}"
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-500 italic">
+                          No independent third-party evidence records were indexed in the ground-truth databases.
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
               </div>
             </div>

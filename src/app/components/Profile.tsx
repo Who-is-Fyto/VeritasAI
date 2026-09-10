@@ -4,10 +4,11 @@ import { Link, useNavigate } from "react-router";
 import {
   User, Shield, History, Settings, ExternalLink, BarChart2,
   FileText, LogOut, CheckCircle2, AlertTriangle, XCircle, ArrowRight,
-  Brain, Sparkles
+  Brain, Sparkles, GraduationCap, Building2, Globe, Edit3, Save, X
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
+import { resolveAffiliation } from "../../utils/affiliation";
 
 const CLIP_STYLES = `
   .clip-corner-xl {
@@ -26,7 +27,52 @@ import { veritasAPI } from "../../services/api";
 export function Profile() {
 
   const navigate = useNavigate();
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, logout, updateProfile } = useAuth();
+  const aff = resolveAffiliation(authUser?.email, authUser);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editInstitution, setEditInstitution] = useState("");
+  const [editRole, setEditRole] = useState("");
+  const [editStudentId, setEditStudentId] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authUser) {
+      setEditName(authUser.name || "");
+      setEditInstitution(authUser.institution || aff.institution);
+      setEditRole(authUser.role || aff.role);
+      setEditStudentId(authUser.student_id || aff.studentId || "");
+    }
+  }, [authUser]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await updateProfile({
+        name: editName.trim(),
+        institution: editInstitution.trim(),
+        role: editRole.trim(),
+        student_id: editStudentId.trim() || undefined,
+      });
+      setIsEditingProfile(false);
+    } catch (err: any) {
+      console.error(err);
+      setEditError(err.message || "Failed to save profile changes.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleResetToInferred = () => {
+    const rawAff = resolveAffiliation(authUser?.email);
+    setEditInstitution(rawAff.institution);
+    setEditRole(rawAff.role);
+    setEditStudentId(rawAff.studentId || "");
+  };
 
   const [trainStatus, setTrainStatus] = useState<any>({
     status: "idle",
@@ -101,13 +147,18 @@ export function Profile() {
 
 
   const user = {
-
-    name: authUser?.name || "Michael Mazhambe",
-    email: authUser?.email || "m.mazhambe@student.richfield.ac.za",
-    studentId: "402100810",
-    role: "BSc Information Technology Student",
-    institution: "Richfield Faculty of ICT",
-    joined: authUser?.joined_at ? new Date(authUser.joined_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "June 2026",
+    name: authUser?.name || (authUser?.email ? authUser.email.split("@")[0] : "User"),
+    email: authUser?.email || "user@example.com",
+    studentId: authUser?.student_id !== undefined ? authUser.student_id : aff.studentId,
+    role: authUser?.role || aff.role,
+    institution: authUser?.institution || aff.institution,
+    accountType: authUser?.account_type || aff.accountType,
+    tierLabel: aff.tierLabel,
+    badgeLabel: aff.badgeLabel,
+    badgeColor: aff.badgeColor,
+    joined: authUser?.joined_at
+      ? new Date(authUser.joined_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+      : new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
   };
 
   const getInitials = (n: string) => {
@@ -169,15 +220,30 @@ export function Profile() {
                 {getInitials(user.name)}
               </div>
               <div>
-                <h1 className="text-3xl font-semibold tracking-tight">{user.name}</h1>
-                <p className="text-blue-100 text-sm mt-1">{user.role}</p>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-3xl font-semibold tracking-tight">{user.name}</h1>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border backdrop-blur-md shadow-sm ${
+                    user.accountType === "academic"
+                      ? "bg-indigo-500/30 text-indigo-100 border-indigo-300/40"
+                      : user.accountType === "enterprise"
+                      ? "bg-emerald-500/30 text-emerald-100 border-emerald-300/40"
+                      : "bg-white/20 text-blue-100 border-white/30"
+                  }`}>
+                    {user.badgeLabel}
+                  </span>
+                </div>
+                <p className="text-blue-100 text-sm mt-1 flex items-center gap-2 flex-wrap">
+                  <span>{user.role}</span>
+                  <span>•</span>
+                  <span>{user.institution}</span>
+                </p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate("/verify")}
-                className="px-5 py-2.5 bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition-all font-semibold clip-corner-sm text-sm"
+                className="px-5 py-2.5 bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition-all font-semibold clip-corner-sm text-sm cursor-pointer shadow-sm"
               >
                 New Analysis
               </button>
@@ -186,7 +252,7 @@ export function Profile() {
                   logout();
                   navigate("/login");
                 }}
-                className="px-5 py-2.5 bg-red-600/30 border border-red-500/20 text-white rounded-lg hover:bg-red-600/40 transition-all font-semibold clip-corner-sm text-sm flex items-center gap-2"
+                className="px-5 py-2.5 bg-red-600/30 border border-red-500/20 text-white rounded-lg hover:bg-red-600/40 transition-all font-semibold clip-corner-sm text-sm flex items-center gap-2 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Log Out</span>
@@ -200,25 +266,74 @@ export function Profile() {
           
           {/* Left Column: Account Details */}
           <div className="space-y-6">
-            <div className="bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
-              <h3 className="flex items-center gap-2 mb-4 font-semibold text-lg">
-                <User className="w-5 h-5 text-blue-600" />
-                Profile Information
-              </h3>
+            <div className="bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="flex items-center gap-2 font-semibold text-lg text-gray-900">
+                  <User className="w-5 h-5 text-blue-600" />
+                  Profile Information
+                </h3>
+                <button
+                  onClick={() => setIsEditingProfile(true)}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 hover:underline cursor-pointer bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Details</span>
+                </button>
+              </div>
               
               <div className="space-y-4 text-sm">
                 <div>
                   <span className="text-muted-foreground block text-xs">Email</span>
-                  <span className="font-medium text-gray-900">{user.email}</span>
+                  <span className="font-medium text-gray-900 break-all">{user.email}</span>
                 </div>
+
                 <div>
-                  <span className="text-muted-foreground block text-xs">Student ID</span>
-                  <span className="font-mono font-medium text-gray-900">{user.studentId}</span>
+                  <span className="text-muted-foreground block text-xs">Affiliation / Institution</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {user.accountType === "academic" ? (
+                      <GraduationCap className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                    ) : user.accountType === "enterprise" ? (
+                      <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    )}
+                    <span className="font-medium text-gray-900">{user.institution}</span>
+                  </div>
                 </div>
+
                 <div>
-                  <span className="text-muted-foreground block text-xs">Institution</span>
-                  <span className="font-medium text-gray-900">{user.institution}</span>
+                  <span className="text-muted-foreground block text-xs">Account Tier & Role</span>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${user.badgeColor}`}>
+                      {user.badgeLabel}
+                    </span>
+                    <span className="text-xs text-gray-700 font-medium">{user.role}</span>
+                  </div>
                 </div>
+
+                {user.accountType === "academic" ? (
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Student / Academic ID</span>
+                    <span className="font-mono font-medium text-gray-900">
+                      {user.studentId || "Academic Member"}
+                    </span>
+                  </div>
+                ) : user.accountType === "enterprise" ? (
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Organization Identifier</span>
+                    <span className="font-mono font-medium text-gray-900">
+                      {user.studentId || "Verified Corporate Member"}
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Account Status</span>
+                    <span className="font-medium text-gray-900">
+                      Standard Community Member
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-muted-foreground block text-xs">Joined</span>
                   <span className="font-medium text-gray-900">{user.joined}</span>
@@ -491,8 +606,116 @@ export function Profile() {
               </div>
             </div>
           </div>
-
         </div>
+
+        {/* Edit Profile Modal */}
+        {isEditingProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl border border-blue-200 shadow-2xl max-w-lg w-full p-6 clip-corner-lg relative">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-5">
+                <div className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-lg text-gray-900">Edit Profile Details</h3>
+                </div>
+                <button
+                  onClick={() => setIsEditingProfile(false)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {editError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  {editError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveProfile} className="space-y-4 text-sm">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3 py-2 bg-blue-50/20 border border-blue-200/60 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Institution / Company
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleResetToInferred}
+                      className="text-[11px] text-blue-600 hover:underline cursor-pointer font-medium"
+                    >
+                      Auto-Detect from Email
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={editInstitution}
+                    onChange={(e) => setEditInstitution(e.target.value)}
+                    placeholder="e.g. Google LLC, Richfield Faculty of ICT, Independent"
+                    className="w-full px-3 py-2 bg-blue-50/20 border border-blue-200/60 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Role / Position
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    placeholder="e.g. Base User, Student Researcher, Enterprise Analyst"
+                    className="w-full px-3 py-2 bg-blue-50/20 border border-blue-200/60 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Student ID or Organization ID <span className="text-gray-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editStudentId}
+                    onChange={(e) => setEditStudentId(e.target.value)}
+                    placeholder="e.g. 402100810 (leave empty for general users)"
+                    className="w-full px-3 py-2 bg-blue-50/20 border border-blue-200/60 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProfile(false)}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{editSaving ? "Saving..." : "Save Changes"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       </div>
       <style>{CLIP_STYLES}</style>

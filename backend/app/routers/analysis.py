@@ -6,9 +6,11 @@ POST /api/v1/analyse  — submit content, run the three-service pipeline,
 
 GET  /api/v1/results/:id — retrieve a stored result by its document ID.
 """
+import asyncio
+import hashlib
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -17,6 +19,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.db.mongodb import get_db
+from app.schemas.auth import UserResponse
 from app.schemas.request import AnalyseRequest
 from app.schemas.response import AnalysisResult, WeightedScores
 from app.services.linguistic import linguistic_service
@@ -24,7 +27,7 @@ from app.services.source import source_service
 from app.services.corroboration import corroboration_service
 
 from app.utils.security import is_safe_url, sanitize_text
-from app.routers.auth import get_user_or_api_key
+from app.routers.auth import get_optional_user_or_api_key
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +46,19 @@ def compute_overall_score(
     )
 
 
+def _scrape_article(target_url: str) -> str:
+    from newspaper import Article, Config
+    cfg = Config()
+    cfg.request_timeout = 5
+    cfg.MAX_FILE_SIZE = 2 * 1024 * 1024
+    cfg.number_of_threads = 1
+    cfg.browser_user_agent = "VeritasAI Credibility Scanner/1.0"
+    article = Article(target_url, config=cfg)
+    article.download()
+    article.parse()
+    return article.text or ""
+
+
 # ── POST /api/v1/analyse ─────────────────────────────────────────────────
 @router.post(
     "/analyse",
@@ -53,14 +69,38 @@ def compute_overall_score(
 async def analyse(
     body: AnalyseRequest,
     db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user: object = Depends(get_user_or_api_key)
+    current_user: UserResponse | None = Depends(get_optional_user_or_api_key)
 ) -> AnalysisResult:
-
     """
     Orchestrates the three analysis services in parallel, computes the
     weighted Credibility Index, persists the result, and returns it.
+    Supports both authenticated accounts and guest analyses.
+    Includes SHA-256 analysis caching for repeated submissions.
     """
-    import asyncio
+    content_hash = hashlib.sha256(f"{body.type}:{body.content.strip()}".encode("utf-8")).hexdigest()
+
+    # ── Check analysis cache (2-hour window) ─────────────────────────────
+    two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+    cached_doc = await db["results"].find_one({
+        "content_hash": content_hash,
+        "status": "complete",
+        "submitted_at": {"$gte": two_hours_ago}
+    })
+    if cached_doc:
+        logger.info("Cache hit for analysis content_hash=%s (reusing doc %s)", content_hash, cached_doc.get("_id"))
+        doc_data = dict(cached_doc)
+        doc_data.pop("_id", None)
+        fresh_id = str(uuid.uuid4())
+        doc_data["id"] = fresh_id
+        doc_data["submitted_at"] = datetime.now(timezone.utc)
+        if current_user:
+            doc_data["user_id"] = current_user.id
+        cached_result = AnalysisResult(**doc_data)
+        insert_payload = {"_id": fresh_id, "content_hash": content_hash, **cached_result.model_dump()}
+        if current_user:
+            insert_payload["user_id"] = current_user.id
+        await db["results"].insert_one(insert_payload)
+        return cached_result
 
     doc_id = str(uuid.uuid4())
     logger.info("Starting analysis %s — type=%s length=%d", doc_id, body.type, len(body.content))
@@ -76,19 +116,7 @@ async def analyse(
             )
 
         try:
-            from newspaper import Article, Config
-            # 2. Configure strict download constraints
-            cfg = Config()
-            cfg.request_timeout = 5               # 5 seconds max timeout
-            cfg.MAX_FILE_SIZE = 2 * 1024 * 1024   # 2MB max file size to prevent zip bombs/giant dumps
-            cfg.number_of_threads = 1
-            cfg.browser_user_agent = "VeritasAI Credibility Scanner/1.0"
-
-            # Run blocking scrape in a thread to keep FastAPI event loop async
-            article = Article(body.content, config=cfg)
-            article.download()
-            article.parse()
-            content_to_analyse = article.text
+            content_to_analyse = await asyncio.to_thread(_scrape_article, body.content)
             if not content_to_analyse or len(content_to_analyse.strip()) < 10:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -105,7 +133,6 @@ async def analyse(
 
     # 3. Sanitise input text (XSS protection)
     content_to_analyse = sanitize_text(content_to_analyse)
-
 
     # ── Run all three services concurrently ──────────────────────────────
     linguistic_task     = linguistic_service.analyse(content_to_analyse)
@@ -127,7 +154,7 @@ async def analyse(
         id=doc_id,
         status="complete",
         input_type=body.type,
-        submitted_at=datetime.utcnow(),
+        submitted_at=datetime.now(timezone.utc),
         overall_score=overall,
         ai_probability=linguistic_result.ai_probability,
         scores=WeightedScores(
@@ -148,10 +175,16 @@ async def analyse(
         content=content_to_analyse,
     )
 
-
     # ── Persist to MongoDB ───────────────────────────────────────────────
-    # result.model_dump() converts Pydantic model → plain dict for Motor
-    await db["results"].insert_one({"_id": doc_id, **result.model_dump()})
+    insert_data = {
+        "_id": doc_id,
+        "content_hash": content_hash,
+        **result.model_dump()
+    }
+    if current_user:
+        insert_data["user_id"] = current_user.id
+
+    await db["results"].insert_one(insert_data)
     logger.info("Analysis %s persisted — overall_score=%.1f", doc_id, overall)
 
     return result
@@ -197,7 +230,7 @@ async def submit_feedback(
         "is_accurate": body.is_accurate,
         "corrected_label": body.corrected_label,
         "corrected_score": body.corrected_score,
-        "submitted_at": datetime.utcnow()
+        "submitted_at": datetime.now(timezone.utc)
     }
 
     await db["results"].update_one(

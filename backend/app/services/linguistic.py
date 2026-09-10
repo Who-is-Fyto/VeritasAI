@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 
 # Common LLM Signature Buzzwords & Synthesised Phrases
 LLM_BUZZWORDS = [
-    "delve into", "tapestry of", "testament to", "crucial role", "pivotal role",
-    "fostering a", "it is worth noting", "it's important to remember",
+    "delve into", "delve deeper", "tapestry of", "testament to", "crucial role", "pivotal role",
+    "fostering a", "it is worth noting", "it's important to remember", "it is crucial to",
     "navigating the complex", "in summary", "in conclusion", "furthermore",
     "moreover", "underscores the", "multifaceted", "paramount", "beacon of",
-    "realm of", "game-changer", "paradigm shift", "vital to note"
+    "realm of", "game-changer", "paradigm shift", "vital to note", "ever-evolving",
+    "rapidly evolving", "at the forefront", "beacon of hope", "seamlessly integrate"
 ]
 
 # Legitimate Real-World Institutions for Valid Attribution
@@ -32,7 +33,8 @@ VALID_INSTITUTIONS = [
     "reuters", "associated press", "ap news", "bbc", "nasa", "who", "cdc",
     "united nations", "un", "harvard", "oxford", "nature", "science", "fda",
     "mit", "stanford", "yale", "journal", "university", "official report",
-    "peer-reviewed", "bureau of labor", "census bureau", "national institute"
+    "peer-reviewed", "bureau of labor", "census bureau", "national institute",
+    "rand corporation", "rand", "brookings", "pew research", "csis"
 ]
 
 # Composite Absurdity & Satire Patterns (Requires absurd co-occurrence of subjects + actions)
@@ -154,12 +156,13 @@ class LinguisticService:
         mean_len = np.mean(lengths) if lengths else 1.0
         std_len = np.std(lengths) if len(lengths) > 1 else 0.0
 
-        cv = std_len / mean_len if mean_len > 0 else 0.5
         burstiness_score = 0.0
-        if cv < 0.25:
-            burstiness_score = 35.0
-        elif cv < 0.4:
-            burstiness_score = 15.0
+        if len(lengths) > 1:
+            cv = std_len / mean_len if mean_len > 0 else 0.5
+            if cv < 0.25:
+                burstiness_score = 35.0
+            elif cv < 0.4:
+                burstiness_score = 15.0
 
         low_text = text.lower()
         buzzword_count = sum(1 for bw in LLM_BUZZWORDS if bw in low_text)
@@ -169,7 +172,17 @@ class LinguisticService:
         ttr = len(set(words)) / len(words) if words else 0.5
         ttr_score = 25.0 if (ttr < 0.45 and len(words) > 50) else 0.0
 
-        total_ai_prob = burstiness_score + buzzword_score + ttr_score + 10.0
+        # Shannon entropy calculation
+        entropy_score = 0.0
+        if len(words) >= 30:
+            import math
+            from collections import Counter
+            counts = Counter(words)
+            entropy = -sum((c / len(words)) * math.log2(c / len(words)) for c in counts.values())
+            if entropy < 3.8:
+                entropy_score = 18.0
+
+        total_ai_prob = burstiness_score + buzzword_score + ttr_score + entropy_score + 10.0
         return max(min(total_ai_prob, 96.0), 4.0)
 
     def _analyse_heuristics(self, text: str, flags: list[LinguisticFlag]) -> LinguisticResult:
@@ -195,20 +208,37 @@ class LinguisticService:
                 absurd_detected = True
                 continue
 
-            # 2. Strict Attribution Verification Check
+            has_manipulative = any(w in s_low for w in manipulative_list)
             has_attribution_phrase = any(phrase in s_low for phrase in ["according to", "reported by", "published in", "stated by", "cited by"])
             has_valid_institution = any(inst in s_low for inst in VALID_INSTITUTIONS)
             has_quantitative = bool(re.search(r"\b(\d+%\s+|\d+\s+percent|\$\d+|\d+\s+million|\d+\s+billion)\b", s_low))
 
-            if has_attribution_phrase:
-                if has_valid_institution or has_quantitative:
+            # 2. Manipulative clickbait framing takes precedence over naive keyword matches
+            if has_manipulative:
+                annotations.append(XAIAnnotation(
+                    text=s,
+                    type=AnnotationType.manipulative,
+                    reason="Sensationalist, clickbait, or emotional manipulation pattern.",
+                    confidence=84.0
+                ))
+                scores_list.append(25.0)
+            elif has_attribution_phrase:
+                if has_valid_institution:
                     annotations.append(XAIAnnotation(
                         text=s,
                         type=AnnotationType.verified,
-                        reason="Attributed to a validated real-world institution or empirical dataset.",
-                        confidence=88.0
+                        reason="Journalistic attribution to a recognized institution or wire service.",
+                        confidence=86.0
                     ))
-                    scores_list.append(90.0)
+                    scores_list.append(88.0)
+                elif has_quantitative:
+                    annotations.append(XAIAnnotation(
+                        text=s,
+                        type=AnnotationType.neutral,
+                        reason="Empirical or statistical claim citing unverified source.",
+                        confidence=70.0
+                    ))
+                    scores_list.append(60.0)
                 else:
                     annotations.append(XAIAnnotation(
                         text=s,
@@ -217,14 +247,14 @@ class LinguisticService:
                         confidence=75.0
                     ))
                     scores_list.append(35.0)
-            elif any(w in s_low for w in manipulative_list):
+            elif has_valid_institution:
                 annotations.append(XAIAnnotation(
                     text=s,
-                    type=AnnotationType.manipulative,
-                    reason="Sensationalist, clickbait, or emotional manipulation pattern.",
-                    confidence=82.0
+                    type=AnnotationType.verified,
+                    reason="Factual statement referencing recognized institutional research or authority.",
+                    confidence=84.0
                 ))
-                scores_list.append(25.0)
+                scores_list.append(85.0)
             else:
                 annotations.append(XAIAnnotation(text=s, type=AnnotationType.neutral, reason="Neutral factual assertion.", confidence=70.0))
                 scores_list.append(65.0)
@@ -257,10 +287,14 @@ class LinguisticService:
         lengths = [len(s.split()) for s in sentences]
         mean_len = np.mean(lengths) if lengths else 1.0
         std_len = np.std(lengths) if len(lengths) > 1 else 0.0
-        cv = std_len / mean_len if mean_len > 0 else 0.5
         
-        burst_rating = f"CV: {cv:.2f} — " + ("Natural human cadence" if cv >= 0.35 else "Monotonous uniform cadence")
-        burst_ok = cv >= 0.35
+        if len(lengths) > 1:
+            cv = std_len / mean_len if mean_len > 0 else 0.5
+            burst_rating = f"CV: {cv:.2f} — " + ("Natural human cadence" if cv >= 0.35 else "Monotonous uniform cadence")
+            burst_ok = cv >= 0.35
+        else:
+            burst_rating = "Standard single-statement cadence"
+            burst_ok = True
 
         low_text = text.lower()
         found_bw = [bw for bw in LLM_BUZZWORDS if bw in low_text]

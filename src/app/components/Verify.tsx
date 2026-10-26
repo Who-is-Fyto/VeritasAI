@@ -1,12 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import {
   FileText, Link as LinkIcon, Upload, Sparkles, ArrowRight,
-  Shield, Brain, Globe, Search, Terminal, AlertCircle
+  Shield, Brain, Globe, Search, Terminal, AlertCircle, CheckCircle2,
+  AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { veritasAPI, VeritasAPIError } from "../../services/api";
+import {
+  validateArticleText,
+  validateUrl,
+  MIN_ARTICLE_CHARS,
+  MAX_ARTICLE_CHARS,
+} from "../../utils/validation";
 
 // ─────────────────────────────────────────────────────────────────────────
 // MOCK FLAG — set VITE_USE_MOCK_API=false in .env to use the real backend.
@@ -59,6 +66,7 @@ export function Verify() {
   const navigate = useNavigate();
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
+  const [touchedUrl, setTouchedUrl] = useState(false);
   const [activeTab, setActiveTab] = useState("text");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeStep, setAnalyzeStep] = useState(-1);
@@ -69,6 +77,15 @@ export function Verify() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logMessages]);
+
+  // Real-time validations
+  const textValidation = useMemo(() => validateArticleText(text), [text]);
+  const urlValidation = useMemo(() => validateUrl(url), [url]);
+
+  const textProgressPercent = Math.min(
+    100,
+    Math.round((textValidation.charCount / MIN_ARTICLE_CHARS) * 100)
+  );
 
   // Push log messages for one step, resolves when all are added
   const addLogsForStep = (stepIdx: number): Promise<void> =>
@@ -88,12 +105,26 @@ export function Verify() {
     });
 
   const handleVerify = async () => {
+    // Client-side validation guard
+    if (activeTab === "text") {
+      if (!textValidation.isValid) {
+        setApiError(textValidation.error || "Please enter valid text content.");
+        return;
+      }
+    } else if (activeTab === "url") {
+      setTouchedUrl(true);
+      if (!urlValidation.isValid) {
+        setApiError(urlValidation.error || "Please enter a valid HTTP/HTTPS URL.");
+        return;
+      }
+    }
+
     setIsAnalyzing(true);
     setAnalyzeStep(0);
     setLogMessages([]);
     setApiError(null);
 
-    const content = activeTab === "text" ? text : url;
+    const content = activeTab === "text" ? text.trim() : url.trim();
 
     try {
       if (USE_MOCK_API) {
@@ -168,15 +199,17 @@ export function Verify() {
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-full mb-5 border border-blue-200/60">
               <Sparkles className="w-4 h-4 text-blue-700" />
-              <span className="text-sm text-blue-700">Multi-Dimensional AI Analysis</span>
+              <span className="text-sm text-blue-700 font-semibold tracking-wide">Multi-Dimensional AI Analysis</span>
             </div>
-            <h1 className="text-4xl lg:text-5xl mb-4 tracking-tight">Submit Content for Analysis</h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Paste text, enter a URL, or upload a document. VeritasAI will produce a full Credibility Index
-              across linguistic, source authority, and fact-checking dimensions.
+            <h1 className="text-4xl lg:text-5xl mb-4 tracking-tight font-extrabold text-slate-900">
+              Submit Content for Verification
+            </h1>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+              Paste article text, enter a public URL, or upload documentation. VeritasAI runs real-time
+              inference across stylometric, source authority, and news corroboration pipelines.
             </p>
             {!USE_MOCK_API && (
-              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 border border-green-200 rounded-full text-xs text-green-700">
+              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 border border-green-200 rounded-full text-xs text-green-700 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                 Connected to live backend
               </div>
@@ -187,7 +220,7 @@ export function Verify() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             {analysisSteps.map((step, i) => (
               <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                isAnalyzing && analyzeStep >= i ? "border-blue-400 bg-blue-100/60" : "border-blue-200/50 bg-white/80"
+                isAnalyzing && analyzeStep >= i ? "border-blue-400 bg-blue-100/60 shadow-xs" : "border-blue-200/50 bg-white/80"
               }`}>
                 <div className={`p-2 rounded-lg clip-corner-icon flex-shrink-0 transition-colors ${
                   isAnalyzing && analyzeStep >= i ? "bg-blue-600" : "bg-blue-100"
@@ -196,12 +229,12 @@ export function Verify() {
                     isAnalyzing && analyzeStep >= i ? "text-white" : "text-blue-600"
                   }`} />
                 </div>
-                <span className="text-xs text-muted-foreground">{step.label}</span>
+                <span className="text-xs font-medium text-slate-700">{step.label}</span>
                 {isAnalyzing && analyzeStep === i && (
                   <Sparkles className="w-3 h-3 text-blue-500 animate-spin ml-auto flex-shrink-0" />
                 )}
                 {isAnalyzing && analyzeStep > i && (
-                  <span className="ml-auto text-green-500 text-xs flex-shrink-0">✓</span>
+                  <span className="ml-auto text-emerald-600 text-xs font-bold flex-shrink-0">✓</span>
                 )}
               </div>
             ))}
@@ -209,7 +242,7 @@ export function Verify() {
 
           {/* Input card */}
           <div className="bg-white rounded-2xl shadow-xl border border-blue-200/60 overflow-hidden clip-corner-xl">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setApiError(null); }}>
               <div className="border-b border-blue-200/50 bg-gradient-to-r from-blue-50/60 to-white">
                 <TabsList className="flex p-2 gap-2">
                   {[
@@ -218,10 +251,10 @@ export function Verify() {
                     { value: "upload", icon: Upload,    label: "Upload File"  },
                   ].map((tab) => (
                     <TabsTrigger key={tab.value} value={tab.value}
-                      className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg transition-all clip-corner-sm ${
+                      className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg transition-all clip-corner-sm font-semibold text-sm ${
                         activeTab === tab.value
                           ? "bg-white shadow-sm text-blue-700 border border-blue-200"
-                          : "text-muted-foreground hover:text-foreground hover:bg-white/60"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                       }`}>
                       <tab.icon className="w-4 h-4" />
                       <span>{tab.label}</span>
@@ -230,62 +263,186 @@ export function Verify() {
                 </TabsList>
               </div>
 
+              {/* Text Input Tab */}
               <TabsContent value="text" className="p-8">
-                <label className="block text-sm text-muted-foreground mb-2">Article, tweet, message, or any text content</label>
-                <textarea value={text} onChange={(e) => setText(e.target.value)}
-                  placeholder="Paste the content you want to verify here..."
-                  className="w-full h-64 p-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-blue-50/30 text-sm leading-relaxed"
-                  disabled={isAnalyzing} />
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {text.length > 0
-                      ? `${text.length} characters · ${Math.ceil(text.split(/\s+/).filter(Boolean).length)} words`
-                      : "Minimum 50 characters recommended"}
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Article, statement, or text excerpt
+                  </label>
+                  <span className="text-xs font-mono text-slate-500">
+                    Min. {MIN_ARTICLE_CHARS} chars · Max {MAX_ARTICLE_CHARS.toLocaleString()} chars
                   </span>
-                  <button onClick={handleVerify} disabled={!text.trim() || isAnalyzing}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-lg hover:from-blue-800 hover:to-blue-600 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 clip-corner-sm">
-                    {isAnalyzing
-                      ? <><Sparkles className="w-4 h-4 animate-spin" /><span>Analysing...</span></>
-                      : <><span>Generate Credibility Index</span><ArrowRight className="w-4 h-4" /></>}
-                  </button>
                 </div>
-              </TabsContent>
 
-              <TabsContent value="url" className="p-8">
-                <label className="block text-sm text-muted-foreground mb-2">Article, news page, or web content URL</label>
                 <div className="relative">
-                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://example.com/article"
-                    className="w-full pl-10 pr-4 py-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50/30 text-sm"
-                    disabled={isAnalyzing} />
+                  <textarea
+                    value={text}
+                    onChange={(e) => {
+                      setText(e.target.value);
+                      if (apiError) setApiError(null);
+                    }}
+                    placeholder="Paste the full article, statement, claim, or tweet to verify..."
+                    className={`w-full h-64 p-4 border rounded-xl outline-none transition-all resize-none text-sm leading-relaxed ${
+                      text.length > 0 && !textValidation.isValid
+                        ? "border-amber-400 bg-amber-50/20 focus:ring-2 focus:ring-amber-400"
+                        : textValidation.isValid
+                        ? "border-emerald-400/80 bg-emerald-50/15 focus:ring-2 focus:ring-emerald-500"
+                        : "border-blue-200 bg-blue-50/30 focus:ring-2 focus:ring-blue-500"
+                    }`}
+                    disabled={isAnalyzing}
+                  />
                 </div>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  VeritasAI will fetch and analyse the article content, metadata, and publisher authority.
-                </p>
-                <div className="mt-6">
-                  <button onClick={handleVerify} disabled={!url.trim() || isAnalyzing}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-lg hover:from-blue-800 hover:to-blue-600 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 clip-corner-sm">
-                    {isAnalyzing
-                      ? <><Sparkles className="w-4 h-4 animate-spin" /><span>Analysing URL...</span></>
-                      : <><span>Analyse URL</span><ArrowRight className="w-4 h-4" /></>}
+
+                {/* Progress bar towards 50 chars threshold */}
+                <div className="mt-2.5">
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        textValidation.isValid
+                          ? "bg-emerald-500"
+                          : text.length > 0
+                          ? "bg-amber-500"
+                          : "bg-slate-300"
+                      }`}
+                      style={{ width: `${textProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Status Bar */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {text.trim().length === 0 ? (
+                      <span className="text-xs text-slate-500">
+                        Minimum {MIN_ARTICLE_CHARS} characters required for NLP inference
+                      </span>
+                    ) : !textValidation.isValid ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-xs font-medium text-amber-800">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                        {textValidation.charCount}/{MIN_ARTICLE_CHARS} characters (Need {textValidation.charsRemaining} more)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        {textValidation.charCount} characters · {textValidation.wordCount} words (Ready for analysis)
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleVerify}
+                    disabled={!textValidation.isValid || isAnalyzing}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-600 text-white rounded-lg hover:from-blue-800 hover:to-blue-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 clip-corner-sm text-sm font-semibold active:scale-[0.99]"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Sparkles className="w-4 h-4 animate-spin" />
+                        <span>Analysing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Generate Credibility Index</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
                 </div>
               </TabsContent>
 
+              {/* URL Input Tab */}
+              <TabsContent value="url" className="p-8">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Article or news web page URL
+                  </label>
+                  <span className="text-xs font-mono text-slate-500">
+                    HTTP/HTTPS protocols supported
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      if (apiError) setApiError(null);
+                    }}
+                    onBlur={() => setTouchedUrl(true)}
+                    placeholder="https://www.reuters.com/world/article"
+                    className={`w-full pl-11 pr-10 py-3.5 text-sm rounded-xl outline-none transition-all ${
+                      touchedUrl && url.trim().length > 0 && !urlValidation.isValid
+                        ? "border-2 border-red-500 bg-red-50/20 text-slate-900"
+                        : urlValidation.isValid
+                        ? "border border-emerald-500/80 bg-emerald-50/20 text-slate-900"
+                        : "border border-blue-200 bg-blue-50/30 text-slate-900 focus:ring-2 focus:ring-blue-500"
+                    }`}
+                    disabled={isAnalyzing}
+                  />
+                  {touchedUrl && url.trim().length > 0 && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      {urlValidation.isValid ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Inline URL Error / Valid Indicator */}
+                {touchedUrl && url.trim().length > 0 && !urlValidation.isValid ? (
+                  <p className="mt-2 text-xs font-medium text-red-600 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{urlValidation.error}</span>
+                  </p>
+                ) : urlValidation.isValid ? (
+                  <p className="mt-2 text-xs font-medium text-emerald-700 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Verified source address: <strong className="font-semibold">{urlValidation.hostname}</strong></span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500">
+                    VeritasAI will extract article text, assess publisher domain credibility, and cross-reference corroborating news.
+                  </p>
+                )}
+
+                <div className="mt-6">
+                  <button
+                    onClick={handleVerify}
+                    disabled={!urlValidation.isValid || isAnalyzing}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-600 text-white rounded-lg hover:from-blue-800 hover:to-blue-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 clip-corner-sm text-sm font-semibold active:scale-[0.99]"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Sparkles className="w-4 h-4 animate-spin" />
+                        <span>Analysing URL...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Analyse Web Source</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </TabsContent>
+
+              {/* Upload File Tab */}
               <TabsContent value="upload" className="p-8">
                 <div className="border-2 border-dashed border-blue-300 rounded-xl p-12 text-center hover:border-blue-400 transition-colors bg-blue-50/30 cursor-pointer">
                   <div className="inline-flex p-4 bg-blue-100 rounded-2xl mb-5 clip-corner-icon">
                     <Upload className="w-8 h-8 text-blue-600" />
                   </div>
-                  <p className="mb-2">Drop your file here or click to browse</p>
-                  <p className="text-sm text-muted-foreground mb-5">Supports PDF, DOC, DOCX, TXT · Max 10 MB</p>
-                  <button className="px-6 py-2.5 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-sm clip-corner-sm">
+                  <p className="mb-2 font-medium text-slate-800">Drop your file here or click to browse</p>
+                  <p className="text-xs text-muted-foreground mb-5">Supports PDF, DOC, DOCX, TXT · Maximum 10 MB</p>
+                  <button className="px-6 py-2.5 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-sm font-semibold clip-corner-sm shadow-xs">
                     Choose File
                   </button>
                 </div>
                 <p className="mt-4 text-xs text-muted-foreground text-center">
-                  Files are processed securely and never stored permanently.
+                  Files are processed securely in-memory and never stored permanently.
                 </p>
               </TabsContent>
             </Tabs>
@@ -327,7 +484,6 @@ export function Verify() {
                         </motion.div>
                       );
                     })}
-
                   </AnimatePresence>
                   {analyzeStep >= 0 && analyzeStep < analysisSteps.length && (
                     <span className="inline-block w-2 h-3.5 bg-blue-400 animate-pulse align-middle" />
@@ -338,15 +494,15 @@ export function Verify() {
             )}
           </AnimatePresence>
 
-          {/* API Error */}
+          {/* API / Validation Error */}
           <AnimatePresence>
             {apiError && !isAnalyzing && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 className="mt-5 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-600" />
                 <div>
-                  <p className="font-medium">Analysis failed</p>
-                  <p className="mt-0.5 opacity-80">{apiError}</p>
+                  <p className="font-semibold text-red-800">Validation / Submission Notice</p>
+                  <p className="mt-0.5 text-xs text-red-700">{apiError}</p>
                 </div>
               </motion.div>
             )}
@@ -355,21 +511,34 @@ export function Verify() {
           {/* Example starters */}
           {!isAnalyzing && (
             <div className="mt-10">
-              <p className="text-sm text-muted-foreground mb-4">Try an example to see VeritasAI in action:</p>
+              <p className="text-xs uppercase font-bold tracking-wider text-slate-500 mb-4">
+                Verified Benchmark Examples:
+              </p>
               <div className="grid md:grid-cols-3 gap-4">
                 {examples.map((example, i) => (
-                  <button key={i} onClick={() => { setActiveTab("text"); setText(example.snippet); setApiError(null); }}
-                    className="group text-left p-4 bg-white border border-blue-200/50 rounded-xl hover:border-blue-300 hover:shadow-md transition-all clip-corner-sm">
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setActiveTab("text");
+                      setText(example.snippet);
+                      setApiError(null);
+                    }}
+                    className="group text-left p-4 bg-white border border-blue-200/50 rounded-xl hover:border-blue-400 hover:shadow-md transition-all clip-corner-sm"
+                  >
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors flex-shrink-0 clip-corner-icon">
-                        <example.icon className="w-4 h-4 text-blue-600" />
+                      <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors flex-shrink-0 clip-corner-icon">
+                        <example.icon className="w-4 h-4 text-blue-600 group-hover:text-white transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm" style={{ fontWeight: 500 }}>{example.title}</p>
-                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">{example.tag}</span>
+                          <p className="text-sm font-semibold text-slate-900">{example.title}</p>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 font-bold rounded">
+                            {example.tag}
+                          </span>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{example.snippet}</p>
+                        <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                          {example.snippet}
+                        </p>
                       </div>
                     </div>
                   </button>

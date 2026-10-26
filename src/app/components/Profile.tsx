@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "../../context/AuthContext";
 import { resolveAffiliation } from "../../utils/affiliation";
+import { validateName } from "../../utils/validation";
 
 const CLIP_STYLES = `
   .clip-corner-xl {
@@ -49,6 +50,11 @@ export function Profile() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nameVal = validateName(editName);
+    if (!nameVal.isValid) {
+      setEditError(nameVal.error || "Please enter a valid display name.");
+      return;
+    }
     setEditSaving(true);
     setEditError(null);
     try {

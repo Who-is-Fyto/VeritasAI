@@ -22,10 +22,10 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Implement cohesive header navigation with brand logo, live status, and responsive navigation links.
 
 ### Phase 2: Form & Input Validation Engine
-- [ ] Implement comprehensive client-side form validation across `Login.tsx`, `Signup.tsx`, and `Verify.tsx`.
-- [ ] Build strict email validation logic to block malformed or nonsense addresses (e.g., `yd@g.com`, single-character domain segments, missing MX structure, invalid TLDs).
-- [ ] Add real-time visual validation feedback (field-level success/error borders, inline helper text, dynamic submit button states).
-- [ ] Ensure backend validation parity in `backend/app/schemas/auth.py` and `backend/app/schemas/request.py`.
+- [x] Implement comprehensive client-side form validation across `Login.tsx`, `Signup.tsx`, and `Verify.tsx`.
+- [x] Build strict email validation logic to block malformed or nonsense addresses (e.g., `yd@g.com`, single-character domain segments, missing MX structure, invalid TLDs).
+- [x] Add real-time visual validation feedback (field-level success/error borders, inline helper text, dynamic submit button states).
+- [x] Ensure backend validation parity in `backend/app/schemas/auth.py` and `backend/app/schemas/request.py`.
 
 ### Phase 3: Multi-Tier Account Architecture
 - [ ] Define formal account tier models across backend schemas and frontend state:

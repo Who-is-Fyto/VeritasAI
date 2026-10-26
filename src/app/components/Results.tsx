@@ -4,6 +4,7 @@ import { veritasAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { getTierConfig } from "../../utils/tierLimits";
 import { PricingModal } from "./PricingModal";
+import { PipelineTracker } from "./PipelineTracker";
 import {
   Shield, AlertTriangle, CheckCircle2, XCircle, Sparkles,
   ExternalLink, Globe, TrendingUp, Brain, Search, FileText,
@@ -741,11 +742,23 @@ export function Results() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50/30 to-white">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading analysis report...</p>
+      <div className="min-h-screen py-12 lg:py-20 bg-gradient-to-b from-blue-50/30 to-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <PipelineTracker
+            currentStep={3}
+            logMessages={[
+              "▸ Fetching cached verification report from MongoDB...",
+              "▸ Querying RoBERTa fine-tuned stylometric checkpoints...",
+              "▸ Loading MediaBias/FactCheck and domain credibility record...",
+              "▸ Rebuilding claim corroboration graph...",
+              "✓ Verification report loaded successfully.",
+            ]}
+            title="Retrieving Verification Intelligence"
+            subtitle="Assembling multimodal fact-checking report and interactive Truth Map from the database cluster."
+            showSkeletonPreview={true}
+          />
         </div>
+        <style>{CLIP_STYLES}</style>
       </div>
     );
   }

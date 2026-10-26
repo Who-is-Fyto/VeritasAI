@@ -37,13 +37,13 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Add mock and backend enforcement of tier limits and feature gating.
 
 ### Phase 4: Frictionless Multi-Step Pipeline Tracker
-- [ ] Replace standard loading spinners with an animated step-by-step progress visualizer powered by Motion:
+- [x] Replace standard loading spinners with an animated step-by-step progress visualizer powered by Motion:
   - Step 1: Article extraction & text cleansing.
   - Step 2: RoBERTa transformer inference & stylometric evaluation.
   - Step 3: Source authority query against MediaBias/FactCheck & publisher records.
   - Step 4: External news corroboration search.
   - Step 5: Truth Map synthesis and final score calculation.
-- [ ] Implement smooth skeleton layout transitions to eliminate layout shifts during analysis.
+- [x] Implement smooth skeleton layout transitions to eliminate layout shifts during analysis.
 
 ### Phase 5: Accessible Credibility Gauge & Verdict
 - [ ] Redesign the primary 0-100 radial/semi-circular Credibility Index meter (PolitiFact Truth-O-Meter inspiration).

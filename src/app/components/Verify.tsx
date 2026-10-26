@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { veritasAPI, VeritasAPIError } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { PricingModal } from "./PricingModal";
+import { PipelineTracker, PIPELINE_STEPS, PIPELINE_STEP_LOGS } from "./PipelineTracker";
 import {
   getTierConfig,
   getDailyQuotaStatus,
@@ -36,39 +37,7 @@ const CLIP_STYLES = `
   .clip-corner-icon{ clip-path: polygon(0 5px,5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%); }
 `;
 
-const analysisSteps = [
-  { icon: Brain,  label: "Linguistic Analysis"   },
-  { icon: Search, label: "Cross-Reference Check" },
-  { icon: Globe,  label: "Source Authority Scan" },
-  { icon: Shield, label: "Credibility Index"     },
-];
-
-const STEP_LOGS: Record<number, string[]> = {
-  0: [
-    "▸ Initialising RoBERTa-base NLP pipeline...",
-    "▸ Loading fine-tuned LIAR/FakeNewsNet weights...",
-    "▸ Running stylometric fingerprint analysis...",
-    "▸ Scoring linguistic integrity patterns...",
-  ],
-  1: [
-    "▸ Querying News API corroboration layer...",
-    "▸ Scanning Reuters, AP, BBC News databases...",
-    "▸ Cross-reference scan: matching articles found",
-    "▸ Computing corroboration confidence scores...",
-  ],
-  2: [
-    "▸ Resolving domain authority score...",
-    "▸ Querying MediaBias/FactCheck whitelist...",
-    "▸ Checking editorial standards registry...",
-    "▸ Source credibility profile: generated",
-  ],
-  3: [
-    "▸ Computing weighted Credibility Index...",
-    "▸ Applying ensemble scoring model (40/35/25)...",
-    "▸ Generating XAI phrase-level annotations...",
-    "✓ Analysis complete — preparing report...",
-  ],
-};
+// Uses formal 5-step PIPELINE_STEPS and PIPELINE_STEP_LOGS from PipelineTracker
 
 export function Verify() {
   const navigate = useNavigate();
@@ -109,13 +78,13 @@ export function Verify() {
   // Push log messages for one step, resolves when all are added
   const addLogsForStep = (stepIdx: number): Promise<void> =>
     new Promise((resolve) => {
-      const messages = STEP_LOGS[stepIdx] ?? [];
+      const messages = PIPELINE_STEP_LOGS[stepIdx] ?? [];
       let i = 0;
       const push = () => {
         if (i < messages.length) {
           setLogMessages((prev) => [...prev, messages[i]]);
           i++;
-          setTimeout(push, 155 + Math.random() * 75);
+          setTimeout(push, 130 + Math.random() * 50);
         } else {
           resolve();
         }
@@ -160,11 +129,11 @@ export function Verify() {
 
     try {
       if (USE_MOCK_API) {
-        // ── Mock path: simulate steps locally ──
-        for (let i = 0; i < analysisSteps.length; i++) {
+        // ── Mock path: simulate 5 pipeline steps locally ──
+        for (let i = 0; i < PIPELINE_STEPS.length; i++) {
           setAnalyzeStep(i);
           await addLogsForStep(i);
-          await new Promise((r) => setTimeout(r, 250));
+          await new Promise((r) => setTimeout(r, 200));
         }
         const id = Math.random().toString(36).substring(7);
         navigate(`/results/${id}`, { state: { text: content, type: activeTab } });
@@ -177,7 +146,7 @@ export function Verify() {
           addLogsForStep(0),
         ]);
 
-        for (let i = 1; i < analysisSteps.length; i++) {
+        for (let i = 1; i < PIPELINE_STEPS.length; i++) {
           setAnalyzeStep(i);
           await addLogsForStep(i);
         }
@@ -222,6 +191,23 @@ export function Verify() {
     },
   ];
 
+  if (isAnalyzing) {
+    return (
+      <div className="min-h-screen py-12 lg:py-20 bg-gradient-to-b from-blue-50/30 via-white to-blue-50/20">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <PipelineTracker
+            currentStep={analyzeStep}
+            logMessages={logMessages}
+            title="Executing Multimodal Verification Pipeline"
+            subtitle="Running 12-layer RoBERTa transformer inference, publisher domain integrity cross-checks, and global news wire corroboration."
+            showSkeletonPreview={true}
+          />
+        </div>
+        <style>{CLIP_STYLES}</style>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-12 lg:py-20 bg-gradient-to-b from-blue-50/30 to-white">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -248,28 +234,29 @@ export function Verify() {
             )}
           </div>
 
-          {/* Step indicators */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            {analysisSteps.map((step, i) => (
-              <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                isAnalyzing && analyzeStep >= i ? "border-blue-400 bg-blue-100/60 shadow-xs" : "border-blue-200/50 bg-white/80"
-              }`}>
-                <div className={`p-2 rounded-lg clip-corner-icon flex-shrink-0 transition-colors ${
-                  isAnalyzing && analyzeStep >= i ? "bg-blue-600" : "bg-blue-100"
-                }`}>
-                  <step.icon className={`w-4 h-4 transition-colors ${
-                    isAnalyzing && analyzeStep >= i ? "text-white" : "text-blue-600"
-                  }`} />
+          {/* 5-Stage Pipeline Overview */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+            {PIPELINE_STEPS.map((step) => {
+              const Icon = step.icon;
+              return (
+                <div
+                  key={step.id}
+                  className="flex items-center gap-2.5 p-3 rounded-xl border border-blue-200/50 bg-white/80 shadow-xs"
+                >
+                  <div className="p-2 rounded-lg bg-blue-100 text-blue-700 shrink-0 clip-corner-icon">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-slate-800 block truncate">
+                      {step.shortName}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block truncate">
+                      Stage {step.id + 1}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xs font-medium text-slate-700">{step.label}</span>
-                {isAnalyzing && analyzeStep === i && (
-                  <Sparkles className="w-3 h-3 text-blue-500 animate-spin ml-auto flex-shrink-0" />
-                )}
-                {isAnalyzing && analyzeStep > i && (
-                  <span className="ml-auto text-emerald-600 text-xs font-bold flex-shrink-0">✓</span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Account Tier & Quota Bar */}
@@ -542,52 +529,6 @@ export function Verify() {
               </TabsContent>
             </Tabs>
           </div>
-
-          {/* ── Live Analysis Log ── */}
-          <AnimatePresence>
-            {isAnalyzing && (
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}
-                className="mt-5 rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-900 border-b border-gray-800">
-                  <div className="flex gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-red-500/80" />
-                    <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                    <span className="w-3 h-3 rounded-full bg-green-500/80" />
-                  </div>
-                  <div className="flex items-center gap-2 ml-1">
-                    <Terminal className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-xs text-gray-400 font-mono">veritas-analysis.log</span>
-                  </div>
-                  <div className="ml-auto flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                    <span className="text-xs text-gray-500 font-mono">LIVE</span>
-                  </div>
-                </div>
-                <div className="bg-gray-950 p-4 font-mono text-xs space-y-1 max-h-44 overflow-y-auto scroll-smooth">
-                  <AnimatePresence initial={false}>
-                    {logMessages.map((msg, i) => {
-                      if (!msg) return null;
-                      const isSuccess = msg.startsWith("✓");
-                      const isFailure = msg.startsWith("✗");
-                      return (
-                        <motion.div key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.15 }}
-                          className={isSuccess ? "text-green-400" : isFailure ? "text-red-400" : "text-blue-300"}>
-                          <span className="text-gray-600 mr-2 select-none">{String(i + 1).padStart(2, "0")}</span>
-                          {msg}
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                  {analyzeStep >= 0 && analyzeStep < analysisSteps.length && (
-                    <span className="inline-block w-2 h-3.5 bg-blue-400 animate-pulse align-middle" />
-                  )}
-                  <div ref={logEndRef} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* API / Validation Error */}
           <AnimatePresence>

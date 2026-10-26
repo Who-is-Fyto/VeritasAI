@@ -16,10 +16,10 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 ## Master Phase Checklist
 
 ### Phase 1: Brand Identity & Design System Upgrade
-- [ ] Define VeritasAI brand identity assets (geometric shield-aperture wordmark, distinctive badge, cohesive typography).
-- [ ] Upgrade design tokens in `src/styles/` with high-contrast slate/zinc neutrals and semantic status accents.
-- [ ] Establish accessible color-coding (Verified Emerald, Caution Amber, Manipulated Crimson) permanently paired with status icons for color-blind accessibility.
-- [ ] Implement cohesive header navigation with brand logo, live status, and responsive navigation links.
+- [x] Define VeritasAI brand identity assets (geometric shield-aperture wordmark, distinctive badge, cohesive typography).
+- [x] Upgrade design tokens in `src/styles/` with high-contrast slate/zinc neutrals and semantic status accents.
+- [x] Establish accessible color-coding (Verified Emerald, Caution Amber, Manipulated Crimson) permanently paired with status icons for color-blind accessibility.
+- [x] Implement cohesive header navigation with brand logo, live status, and responsive navigation links.
 
 ### Phase 2: Form & Input Validation Engine
 - [ ] Implement comprehensive client-side form validation across `Login.tsx`, `Signup.tsx`, and `Verify.tsx`.

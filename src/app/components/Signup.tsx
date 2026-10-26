@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { resolveAffiliation } from "../../utils/affiliation";
+import { BrandLogo } from "./ui/BrandLogo";
 import { User, Mail, Key, AlertCircle, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -49,14 +50,13 @@ export function Signup() {
       >
         {/* Header Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex p-3 bg-blue-500/10 rounded-xl mb-4 border border-blue-500/20 shadow-sm">
-            <img src="/logo.svg" alt="VeritasAI Logo" className="w-8 h-8 object-contain" />
+          <div className="flex justify-center mb-4">
+            <BrandLogo size="md" variant="full" />
           </div>
 
-
-          <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Create Account</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Sign up to access the multi-dimensional credibility engine
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Create Account</h2>
+          <p className="text-xs text-slate-600 mt-1">
+            Access the multimodal credibility engine and XAI truth mapping
           </p>
         </div>
 

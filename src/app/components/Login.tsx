@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BrandLogo } from "./ui/BrandLogo";
 import { Link, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { Shield, Sparkles, Key, Mail, AlertCircle, ArrowRight } from "lucide-react";
@@ -51,14 +52,13 @@ export function Login() {
       >
         {/* Header Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex p-3 bg-blue-500/10 rounded-xl mb-4 border border-blue-500/20 shadow-sm">
-            <img src="/logo.svg" alt="VeritasAI Logo" className="w-8 h-8 object-contain" />
+          <div className="flex justify-center mb-4">
+            <BrandLogo size="md" variant="full" />
           </div>
 
-
-          <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Welcome Back</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Log in to verify credibility and view analytics
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Welcome Back</h2>
+          <p className="text-xs text-slate-600 mt-1">
+            Authenticate to verify news credibility and review audit trails
           </p>
         </div>
 

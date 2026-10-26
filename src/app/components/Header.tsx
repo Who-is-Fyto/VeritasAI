@@ -27,7 +27,7 @@ import {
 
 export function Header() {
   const location = useLocation();
-  const { user, isLoggedIn, logout } = useAuth();
+  const { user, isLoggedIn, logout, tier, changeTier } = useAuth();
   const [pricingOpen, setPricingOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -41,8 +41,6 @@ export function Header() {
       .toUpperCase();
   };
 
-  // Determine user account tier
-  const tier = (user as any)?.tier || (user?.account_type === 'academic' ? 'academic' : 'free');
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin' || user?.email?.includes('admin');
 
   const tierBadges: Record<string, { label: string; class: string; icon: React.ElementType }> = {
@@ -330,6 +328,7 @@ export function Header() {
         open={pricingOpen}
         onOpenChange={setPricingOpen}
         currentTier={tier}
+        onSelectTier={changeTier}
       />
     </>
   );

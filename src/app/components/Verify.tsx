@@ -4,10 +4,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import {
   FileText, Link as LinkIcon, Upload, Sparkles, ArrowRight,
   Shield, Brain, Globe, Search, Terminal, AlertCircle, CheckCircle2,
-  AlertTriangle
+  AlertTriangle, Zap, RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { veritasAPI, VeritasAPIError } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+import { PricingModal } from "./PricingModal";
+import {
+  getTierConfig,
+  getDailyQuotaStatus,
+  recordScanUsage,
+  resetDailyQuota,
+} from "../../utils/tierLimits";
 import {
   validateArticleText,
   validateUrl,
@@ -64,6 +72,10 @@ const STEP_LOGS: Record<number, string[]> = {
 
 export function Verify() {
   const navigate = useNavigate();
+  const { user, tier, changeTier } = useAuth();
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [quotaTick, setQuotaTick] = useState(0);
+
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [touchedUrl, setTouchedUrl] = useState(false);
@@ -77,6 +89,13 @@ export function Verify() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logMessages]);
+
+  // Account tier and daily quota status
+  const quota = useMemo(() => {
+    return getDailyQuotaStatus(tier, user?.id);
+  }, [tier, user?.id, quotaTick]);
+
+  const tierConfig = getTierConfig(tier);
 
   // Real-time validations
   const textValidation = useMemo(() => validateArticleText(text), [text]);
@@ -119,10 +138,23 @@ export function Verify() {
       }
     }
 
+    // Quota guard for Free Tier
+    if (!quota.hasQuota) {
+      setApiError(
+        `Daily verification quota reached (${quota.limit}/${quota.limit} scans used today). Upgrade to Pro Journalist for unlimited real-time verifications.`
+      );
+      setPricingOpen(true);
+      return;
+    }
+
     setIsAnalyzing(true);
     setAnalyzeStep(0);
     setLogMessages([]);
     setApiError(null);
+
+    // Record scan quota consumption
+    recordScanUsage(user?.id);
+    setQuotaTick((t) => t + 1);
 
     const content = activeTab === "text" ? text.trim() : url.trim();
 
@@ -238,6 +270,69 @@ export function Verify() {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Account Tier & Quota Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 mb-6 bg-white border border-blue-200/60 rounded-xl shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${tierConfig.badgeClass}`}>
+                {tierConfig.badgeLabel}
+              </span>
+              {quota.isUnlimited ? (
+                <span className="text-xs text-slate-700 font-medium">
+                  Unlimited Real-Time Verifications Unlocked
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-700 font-medium">
+                    Daily Quota: <strong>{quota.used}</strong> / {quota.limit} used ({quota.remaining} remaining today)
+                  </span>
+                  <div className="w-20 bg-slate-100 rounded-full h-1.5 overflow-hidden hidden sm:block">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        quota.remaining <= 1 ? "bg-amber-500" : "bg-blue-600"
+                      }`}
+                      style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {!quota.isUnlimited ? (
+                <button
+                  type="button"
+                  onClick={() => setPricingOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Upgrade to Pro</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPricingOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  <span>Change Plan</span>
+                </button>
+              )}
+              {/* Defense Demonstration Reset Quota button */}
+              {!quota.isUnlimited && quota.used > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetDailyQuota(user?.id);
+                    setQuotaTick((t) => t + 1);
+                  }}
+                  title="Reset daily scan count for demonstration"
+                  className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Input card */}
@@ -548,6 +643,14 @@ export function Verify() {
           )}
         </motion.div>
       </div>
+
+      {/* Commercial Account Tiers Modal */}
+      <PricingModal
+        open={pricingOpen}
+        onOpenChange={setPricingOpen}
+        currentTier={tier}
+        onSelectTier={changeTier}
+      />
       <style>{CLIP_STYLES}</style>
     </div>
   );

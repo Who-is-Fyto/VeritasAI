@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { veritasAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+import { getTierConfig } from "../../utils/tierLimits";
+import { PricingModal } from "./PricingModal";
 import {
   Shield, AlertTriangle, CheckCircle2, XCircle, Sparkles,
   ExternalLink, Globe, TrendingUp, Brain, Search, FileText,
@@ -637,6 +640,9 @@ export function Results() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { text: stateText, type: stateType, result } = location.state || {};
+  const { tier, changeTier } = useAuth();
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const tierConfig = getTierConfig(tier);
 
   const [loading, setLoading] = useState(false);
   const [loadedResult, setLoadedResult] = useState<any>(result);
@@ -1377,15 +1383,34 @@ export function Results() {
               Analyse New Content
             </button>
             <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer font-semibold"
+              onClick={() => {
+                if (!tierConfig.allowsPdfExport) {
+                  setPricingOpen(true);
+                  return;
+                }
+                window.print();
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer font-semibold shadow-xs"
             >
               <Download className="w-4 h-4" />
-              Export Full Report
+              <span>Export Full Report</span>
+              {!tierConfig.allowsPdfExport && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase">
+                  PRO
+                </span>
+              )}
             </button>
           </div>
         </motion.div>
       </div>
+
+      {/* Commercial Account Tiers Modal */}
+      <PricingModal
+        open={pricingOpen}
+        onOpenChange={setPricingOpen}
+        currentTier={tier}
+        onSelectTier={changeTier}
+      />
 
       <style>{CLIP_STYLES}</style>
     </div>

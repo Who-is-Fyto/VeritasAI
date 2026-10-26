@@ -28,13 +28,13 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Ensure backend validation parity in `backend/app/schemas/auth.py` and `backend/app/schemas/request.py`.
 
 ### Phase 3: Multi-Tier Account Architecture
-- [ ] Define formal account tier models across backend schemas and frontend state:
+- [x] Define formal account tier models across backend schemas and frontend state:
   - **Free Tier:** 5 daily verifications, standard RoBERTa analysis, public web corroboration.
   - **Pro / Paid Tier:** Unlimited verifications, deep corroboration, priority queue, PDF audit exports, batch analysis.
   - **Academic / Enterprise Tier:** Team workspaces, bulk API keys, active self-training feedback loop.
-- [ ] Add tier badges across user profiles, headers, and dashboard views.
-- [ ] Create a commercial "Upgrade / Plan Comparison" modal explaining pricing and feature tiering for examiner review.
-- [ ] Add mock and backend enforcement of tier limits and feature gating.
+- [x] Add tier badges across user profiles, headers, and dashboard views.
+- [x] Create a commercial "Upgrade / Plan Comparison" modal explaining pricing and feature tiering for examiner review.
+- [x] Add mock and backend enforcement of tier limits and feature gating.
 
 ### Phase 4: Frictionless Multi-Step Pipeline Tracker
 - [ ] Replace standard loading spinners with an animated step-by-step progress visualizer powered by Motion:

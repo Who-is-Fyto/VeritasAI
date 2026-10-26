@@ -37,6 +37,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       const savedUser = localStorage.getItem("veritas_user");
       return (savedUser ? JSON.parse(savedUser) : { id: "mock-user-123", email: "mock@veritas.ai", name: "Mock User", joined_at: new Date().toISOString() }) as T;
     }
+    if (path.startsWith("/api/v1/auth/tier")) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      const savedUserStr = localStorage.getItem("veritas_user");
+      const current = savedUserStr ? JSON.parse(savedUserStr) : {};
+      const updated = { ...current, tier: body.tier, account_type: body.tier === "academic" ? "academic" : body.tier === "pro" ? "enterprise" : "base" };
+      localStorage.setItem("veritas_user", JSON.stringify(updated));
+      return updated as T;
+    }
     if (path.startsWith("/api/v1/auth/keys")) {
       if (options?.method === "POST") {
         const body = JSON.parse(options.body as string);
@@ -190,10 +198,20 @@ export const veritasAPI = {
    * PUT /api/v1/auth/profile
    * Update active user account profile.
    */
-  updateProfile: (payload: { name?: string; institution?: string; role?: string; student_id?: string }): Promise<any> =>
+  updateProfile: (payload: { name?: string; institution?: string; role?: string; student_id?: string; tier?: string }): Promise<any> =>
     request("/api/v1/auth/profile", {
       method: "PUT",
       body: JSON.stringify(payload),
+    }),
+
+  /**
+   * PUT /api/v1/auth/tier
+   * Update user account commercial tier.
+   */
+  updateTier: (tier: string): Promise<any> =>
+    request("/api/v1/auth/tier", {
+      method: "PUT",
+      body: JSON.stringify({ tier }),
     }),
 
   /**

@@ -21,7 +21,7 @@ from app.db.mongodb import get_db
 from app.schemas.auth import (
     UserRegister, UserLogin, UserResponse, TokenResponse,
     APIKeyCreate, APIKeyResponse, APIKeyGeneratedResponse,
-    UserProfileUpdate
+    UserProfileUpdate, TierUpdateRequest
 )
 from app.services.affiliation import resolve_user_affiliation
 
@@ -34,15 +34,35 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 
 def build_user_response(user_doc: dict) -> UserResponse:
     aff = resolve_user_affiliation(user_doc.get("email", ""), user_doc)
+    role = user_doc.get("role") or aff["role"]
+    account_type = user_doc.get("account_type") or aff["account_type"]
+
+    explicit_tier = user_doc.get("tier")
+    if explicit_tier:
+        tier = explicit_tier.lower()
+    elif role.lower() in {"superadmin", "admin"}:
+        tier = "superadmin"
+    elif account_type == "academic":
+        tier = "academic"
+    elif account_type == "enterprise":
+        tier = "pro"
+    else:
+        tier = "free"
+
+    daily_limit = 5 if tier == "free" else 999999
+
     return UserResponse(
         id=user_doc["_id"],
         email=user_doc["email"],
         name=user_doc.get("name", "User"),
         joined_at=user_doc["joined_at"],
-        role=user_doc.get("role") or aff["role"],
+        role=role,
         institution=user_doc.get("institution") or aff["institution"],
         student_id=user_doc.get("student_id") or aff["student_id"],
-        account_type=user_doc.get("account_type") or aff["account_type"],
+        account_type=account_type,
+        tier=tier,
+        daily_limit=daily_limit,
+        daily_used=user_doc.get("daily_used", 0),
     )
 
 
@@ -283,8 +303,36 @@ async def update_profile(
     if body.student_id is not None:
         update_fields["student_id"] = body.student_id.strip()
 
+    if body.tier is not None:
+        update_fields["tier"] = body.tier.strip().lower()
+    if body.account_type is not None:
+        update_fields["account_type"] = body.account_type.strip().lower()
+
     if update_fields:
         await db["users"].update_one({"_id": current_user.id}, {"$set": update_fields})
+
+    updated_doc = await db["users"].find_one({"_id": current_user.id})
+    return build_user_response(updated_doc)
+
+
+# ── PUT /api/v1/auth/tier ────────────────────────────────────────────────
+@router.put(
+    "/tier",
+    response_model=UserResponse,
+    summary="Update current user account commercial tier"
+)
+async def update_tier(
+    body: TierUpdateRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> UserResponse:
+    target_tier = body.tier.lower()
+    account_type = "academic" if target_tier == "academic" else "enterprise" if target_tier == "pro" else "base"
+
+    await db["users"].update_one(
+        {"_id": current_user.id},
+        {"$set": {"tier": target_tier, "account_type": account_type}}
+    )
 
     updated_doc = await db["users"].find_one({"_id": current_user.id})
     return build_user_response(updated_doc)

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -7,18 +7,50 @@ import {
   DialogDescription,
 } from './ui/dialog';
 import { Button } from './ui/button';
-import { Check, ShieldCheck, Zap, Sparkles, Building2, HelpCircle } from 'lucide-react';
+import { Check, ShieldCheck, Zap, Sparkles, Building2, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { AccountTier, TIER_CONFIGS } from '../../utils/tierLimits';
 
 interface PricingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentTier?: string;
+  currentTier?: AccountTier | string;
+  onSelectTier?: (tier: AccountTier) => Promise<void> | void;
 }
 
-export function PricingModal({ open, onOpenChange, currentTier = 'free' }: PricingModalProps) {
+export function PricingModal({
+  open,
+  onOpenChange,
+  currentTier = 'free',
+  onSelectTier,
+}: PricingModalProps) {
+  const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const normalizedCurrentTier = (currentTier || 'free').toLowerCase();
+
+  const handleTierClick = async (tierId: AccountTier) => {
+    if (tierId === normalizedCurrentTier) return;
+    setUpgradingTo(tierId);
+    try {
+      if (onSelectTier) {
+        await onSelectTier(tierId);
+      }
+      const tierName = TIER_CONFIGS[tierId]?.name || tierId;
+      setSuccessMessage(`Successfully switched account to ${tierName}!`);
+      setTimeout(() => {
+        setSuccessMessage(null);
+        setUpgradingTo(null);
+        onOpenChange(false);
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+      setUpgradingTo(null);
+    }
+  };
+
   const tiers = [
     {
-      id: 'free',
+      id: 'free' as AccountTier,
       name: 'Community / Free',
       badge: 'Public Tier',
       price: '$0',
@@ -26,9 +58,9 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
       description: 'Ideal for casual readers, students, and basic fact-checking inquiries.',
       icon: ShieldCheck,
       iconColor: 'text-slate-600 bg-slate-100',
-      buttonText: currentTier === 'free' ? 'Current Plan' : 'Downgrade to Free',
+      buttonText: normalizedCurrentTier === 'free' ? 'Current Plan' : 'Downgrade to Free',
       buttonVariant: 'outline' as const,
-      isCurrent: currentTier === 'free',
+      isCurrent: normalizedCurrentTier === 'free',
       features: [
         '5 daily credibility scans',
         'RoBERTa linguistic NLP analysis',
@@ -39,11 +71,11 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
       limitations: [
         'No PDF Audit Certificate export',
         'Standard queue processing (~10s)',
-        'No batch analysis',
+        'No batch analysis or API keys',
       ],
     },
     {
-      id: 'pro',
+      id: 'pro' as AccountTier,
       name: 'Journalist & Pro',
       badge: 'Most Popular',
       price: '$19',
@@ -51,21 +83,21 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
       description: 'For investigative journalists, newsrooms, and professional fact-checkers.',
       icon: Zap,
       iconColor: 'text-blue-600 bg-blue-100',
-      buttonText: currentTier === 'pro' ? 'Current Plan' : 'Upgrade to Pro',
+      buttonText: normalizedCurrentTier === 'pro' ? 'Current Plan' : 'Upgrade to Pro',
       buttonVariant: 'default' as const,
-      isCurrent: currentTier === 'pro',
+      isCurrent: normalizedCurrentTier === 'pro',
       highlighted: true,
       features: [
         'Unlimited daily credibility verifications',
-        'Deep multi-hop wire corroboration (Reuters, AP, AFP)',
-        'Explainable AI (XAI) confidence popovers',
-        'Exportable PDF Audit Certificates for reporting',
         'Priority queue (< 3s inference)',
+        'Exportable PDF Audit Certificates with unique ID',
+        'Deep multi-hop wire corroboration (Reuters, AP, AFP)',
         'Claim-by-claim verdict breakdowns',
+        'Developer REST API keys (up to 5 active keys)',
       ],
     },
     {
-      id: 'academic',
+      id: 'academic' as AccountTier,
       name: 'Academic / Enterprise',
       badge: 'Institutional',
       price: '$49',
@@ -73,16 +105,16 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
       description: 'For universities, research institutes, and intelligence organizations.',
       icon: Building2,
       iconColor: 'text-indigo-600 bg-indigo-100',
-      buttonText: currentTier === 'academic' ? 'Current Plan' : 'Request Institutional Access',
+      buttonText: normalizedCurrentTier === 'academic' ? 'Current Plan' : 'Activate Academic Seat',
       buttonVariant: 'outline' as const,
-      isCurrent: currentTier === 'academic',
+      isCurrent: normalizedCurrentTier === 'academic',
       features: [
         'All Pro tier capabilities included',
-        'REST API Developer Keys with custom rate limits',
-        'Institutional domain auto-affiliation (.edu / .ac)',
-        'Active learning self-training feedback loop access',
-        'Super Admin audit logging and database telemetry',
-        'Dedicated onboarding and methodology documentation',
+        'Active learning self-training loop triggers',
+        'Institutional domain auto-affiliation (.edu / .ac.za)',
+        'Unlimited developer API keys with high limits',
+        'Team workspaces and audit trail inspection',
+        'Methodology report and weight telemetry export',
       ],
     },
   ];
@@ -102,9 +134,17 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
           </DialogDescription>
         </DialogHeader>
 
+        {successMessage && (
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm flex items-center gap-2 font-medium">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {tiers.map((tier) => {
             const Icon = tier.icon;
+            const isTarget = upgradingTo === tier.id;
             return (
               <div
                 key={tier.id}
@@ -140,13 +180,13 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
 
                 <Button
                   variant={tier.buttonVariant}
-                  className={`w-full mb-6 text-xs font-semibold py-2.5 rounded-xl ${
+                  className={`w-full mb-6 text-xs font-semibold py-2.5 rounded-xl cursor-pointer ${
                     tier.highlighted ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' : ''
                   }`}
-                  disabled={tier.isCurrent}
-                  onClick={() => onOpenChange(false)}
+                  disabled={tier.isCurrent || isTarget}
+                  onClick={() => handleTierClick(tier.id)}
                 >
-                  {tier.buttonText}
+                  {isTarget ? 'Updating Plan...' : tier.buttonText}
                 </Button>
 
                 <div className="space-y-2.5 text-xs text-slate-700 flex-1">
@@ -175,7 +215,7 @@ export function PricingModal({ open, onOpenChange, currentTier = 'free' }: Prici
           <p>
             Academic institutions automatically qualify for subsidized access through accredited institutional domains (.ac / .edu).
           </p>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-slate-600">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-slate-600 cursor-pointer">
             Close Overview
           </Button>
         </div>

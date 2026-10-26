@@ -138,6 +138,8 @@ class UserProfileUpdate(BaseModel):
     institution: str | None = Field(None, max_length=150)
     role: str | None = Field(None, max_length=100)
     student_id: str | None = Field(None, max_length=50)
+    tier: str | None = Field(None, max_length=50)
+    account_type: str | None = Field(None, max_length=50)
 
     @field_validator("name")
     @classmethod
@@ -149,6 +151,18 @@ class UserProfileUpdate(BaseModel):
             raise ValueError("Name must be at least 2 characters long")
         if not re.match(r"^[a-zA-Z\s'-]+$", clean):
             raise ValueError("Name may only contain letters, spaces, hyphens, and apostrophes")
+        return clean
+
+
+class TierUpdateRequest(BaseModel):
+    tier: str = Field(..., description="Target account tier: free, pro, or academic")
+
+    @field_validator("tier")
+    @classmethod
+    def validate_tier_label(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if clean not in {"free", "pro", "academic", "superadmin"}:
+            raise ValueError("Invalid tier. Must be 'free', 'pro', or 'academic'")
         return clean
 
 
@@ -171,6 +185,9 @@ class UserResponse(BaseModel):
     institution: str = "Independent / General Public"
     student_id: str | None = None
     account_type: str = "base"
+    tier: str = "free"
+    daily_limit: int = 5
+    daily_used: int = 0
 
 
 class TokenResponse(BaseModel):

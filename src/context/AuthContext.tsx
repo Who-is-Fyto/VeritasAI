@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { veritasAPI } from "../services/api";
 import { resolveAffiliation } from "../utils/affiliation";
+import { AccountTier, resolveTier } from "../utils/tierLimits";
 
 export interface User {
   id: string;
@@ -10,7 +11,8 @@ export interface User {
   role?: string;
   institution?: string;
   student_id?: string;
-  account_type?: "academic" | "enterprise" | "base";
+  account_type?: "academic" | "enterprise" | "base" | "pro" | "free";
+  tier?: AccountTier;
 }
 
 interface AuthContextType {
@@ -18,9 +20,11 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   isLoggedIn: boolean;
+  tier: AccountTier;
   login: (credentials: any) => Promise<void>;
   register: (payload: any) => Promise<void>;
   updateProfile: (payload: any) => Promise<void>;
+  changeTier: (tier: AccountTier) => Promise<void>;
   logout: () => void;
 }
 
@@ -31,14 +35,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const currentTier = resolveTier(user);
+
   useEffect(() => {
     // 1. Initialise auth state from localStorage
     const savedToken = localStorage.getItem("veritas_token");
     const savedUser = localStorage.getItem("veritas_user");
 
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        setToken(savedToken);
+        setUser(parsed);
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+      }
       
       if (import.meta.env.VITE_USE_MOCK_API !== "false") {
         setLoading(false);
@@ -67,6 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
       const aff = resolveAffiliation(credentials.email);
+      const tier: AccountTier =
+        aff.accountType === "academic" ? "academic" : aff.accountType === "enterprise" ? "pro" : "free";
+
       const mockUser: User = {
         id: "mock-user-123",
         email: credentials.email,
@@ -76,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: aff.role,
         student_id: aff.studentId || undefined,
         account_type: aff.accountType,
+        tier,
       };
       setToken("mock-token-abc");
       setUser(mockUser);
@@ -100,6 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
       const aff = resolveAffiliation(payload.email);
+      const tier: AccountTier =
+        aff.accountType === "academic" ? "academic" : aff.accountType === "enterprise" ? "pro" : "free";
+
       const mockUser: User = {
         id: "mock-user-123",
         email: payload.email,
@@ -109,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: payload.role || aff.role,
         student_id: payload.student_id || aff.studentId || undefined,
         account_type: aff.accountType,
+        tier,
       };
       setToken("mock-token-abc");
       setUser(mockUser);
@@ -150,6 +169,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("veritas_user", JSON.stringify(updatedUser));
   };
 
+  const changeTier = async (newTier: AccountTier) => {
+    if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const updated: User = {
+        ...(user || {
+          id: "mock-user-123",
+          email: "user@example.com",
+          name: "User",
+          joined_at: new Date().toISOString(),
+        }),
+        tier: newTier,
+        account_type: newTier === "academic" ? "academic" : newTier === "pro" ? "enterprise" : "base",
+      };
+      setUser(updated);
+      localStorage.setItem("veritas_user", JSON.stringify(updated));
+      return;
+    }
+
+    const updatedUser = await veritasAPI.updateTier(newTier);
+    setUser(updatedUser);
+    localStorage.setItem("veritas_user", JSON.stringify(updatedUser));
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -164,9 +205,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         loading,
         isLoggedIn: !!token,
+        tier: currentTier,
         login,
         register,
         updateProfile,
+        changeTier,
         logout,
       }}
     >

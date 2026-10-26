@@ -4,8 +4,9 @@ Tests nonsense email rejection (yd@g.com), password complexity, name checks, and
 """
 import pytest
 from pydantic import ValidationError
-from app.schemas.auth import UserRegister, validate_strict_email
+from app.schemas.auth import UserRegister, validate_strict_email, TierUpdateRequest, UserResponse
 from app.schemas.request import AnalyseRequest, InputType
+from datetime import datetime, timezone
 
 
 def test_validate_strict_email_valid():
@@ -103,3 +104,31 @@ def test_analyse_request_url_validation():
     # Localhost / internal
     with pytest.raises(ValidationError):
         AnalyseRequest(content="http://localhost:8000/test", type=InputType.url)
+
+
+def test_account_tier_validation():
+    # Valid tiers
+    for tier in ["free", "pro", "academic", "superadmin"]:
+        req = TierUpdateRequest(tier=tier)
+        assert req.tier == tier
+
+    # Case insensitivity
+    req_upper = TierUpdateRequest(tier="PRO")
+    assert req_upper.tier == "pro"
+
+    # Invalid tier rejects
+    with pytest.raises(ValidationError):
+        TierUpdateRequest(tier="invalid_unauthorized_tier")
+
+    # UserResponse default tier and quotas
+    user_res = UserResponse(
+        id="usr-123",
+        email="michael@student.richfield.ac.za",
+        name="Michael",
+        joined_at=datetime.now(timezone.utc),
+        tier="pro",
+        daily_limit=999999,
+        daily_used=0
+    )
+    assert user_res.tier == "pro"
+    assert user_res.daily_limit == 999999

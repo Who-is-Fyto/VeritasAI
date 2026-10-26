@@ -22,9 +22,9 @@ export function BrandLogo({
   };
 
   const textSizes = {
-    sm: 'text-lg',
-    md: 'text-xl',
-    lg: 'text-2xl',
+    sm: 'text-xl',
+    md: 'text-2xl',
+    lg: 'text-3xl',
   };
 
   const Mark = (
@@ -107,21 +107,24 @@ export function BrandLogo({
     <div className="flex flex-col">
       <div className="flex items-center gap-1.5 leading-none">
         <span
-          className={`font-black tracking-tight text-slate-950 dark:text-white ${textSizes[size]}`}
-          style={{ letterSpacing: '-0.03em' }}
+          className={`font-black tracking-tight text-blue-950 ${textSizes[size]}`}
+          style={{ letterSpacing: '-0.025em', color: '#0f275e' }}
         >
-          VERITAS
+          Veritas
         </span>
-        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-gradient-to-r from-blue-700 to-blue-600 text-white font-extrabold text-xs tracking-wider shadow-xs">
+        <span
+          className={`font-black tracking-tight text-blue-600 ${textSizes[size]}`}
+          style={{ letterSpacing: '-0.02em', color: '#2563eb' }}
+        >
           AI
         </span>
         {showBadge && (
-          <span className="ml-1 inline-flex items-center rounded-md bg-slate-900/5 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 ring-1 ring-inset ring-slate-900/10 uppercase tracking-wider">
+          <span className="ml-1.5 inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200 uppercase tracking-wider">
             {badgeText}
           </span>
         )}
       </div>
-      <span className="text-[10px] font-bold tracking-widest text-slate-600 uppercase mt-0.5">
+      <span className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase mt-0.5">
         Multimodal Credibility Engine
       </span>
     </div>

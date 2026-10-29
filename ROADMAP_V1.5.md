@@ -59,9 +59,9 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
   - Domain age, registration security, and historic fact-check record.
 
 ### Phase 7: Interactive Truth Map with Floating XAI Popovers
-- [ ] Overhaul sentence-level RoBERTa text annotation display in `Results.tsx` (Grammarly-style inline highlights).
-- [ ] Add category filter pills (Sensationalism, Partisan Bias, Unsubstantiated Claim, Factual Evidence).
-- [ ] Implement floating hover/click inspection cards displaying model confidence %, linguistic flags, and plain-English explanations.
+- [x] Overhaul sentence-level RoBERTa text annotation display in `Results.tsx` (Grammarly-style inline highlights).
+- [x] Add category filter pills (Sensationalism, Partisan Bias, Unsubstantiated Claim, Factual Evidence).
+- [x] Implement floating hover/click inspection cards displaying model confidence %, linguistic flags, and plain-English explanations.
 
 ### Phase 8: Claim Extraction & Verdict Accordion
 - [ ] Redesign the extracted claims section into structured, high-contrast callout cards (Full Fact inspiration).

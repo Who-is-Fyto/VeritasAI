@@ -7,6 +7,7 @@ import { PricingModal } from "./PricingModal";
 import { PipelineTracker } from "./PipelineTracker";
 import { CredibilityGauge } from "./CredibilityGauge";
 import { SourceNutritionLabel } from "./SourceNutritionLabel";
+import { TruthMap } from "./TruthMap";
 import { getCredibilityConfig, CredibilityTier } from "../../utils/credibilityTheme";
 import {
   Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Sparkles,
@@ -76,365 +77,6 @@ const CLIP_STYLES = `
   }
 `;
 
-
-/* ─────────────────────────────────────────────
-   XAI ANNOTATION TYPES
-───────────────────────────────────────────── */
-interface TextAnnotation {
-  text: string;
-  type: "manipulative" | "verified" | "unverified" | "neutral";
-  reason?: string;
-  confidence?: number;
-}
-
-const ANNOTATION_CONFIG = {
-  manipulative: {
-    bg: "bg-red-100",
-    border: "border-b-2 border-red-400",
-    dot: "bg-red-400",
-    label: "Manipulation Marker",
-    icon: AlertCircle,
-    badge: "bg-red-100 text-red-700 border border-red-200",
-    tooltip: "bg-red-950",
-    textColor: "text-red-300",
-  },
-  verified: {
-    bg: "bg-green-100",
-    border: "border-b-2 border-green-400",
-    dot: "bg-green-500",
-    label: "Verified Signal",
-    icon: CheckCircle2,
-    badge: "bg-green-100 text-green-700 border border-green-200",
-    tooltip: "bg-green-950",
-    textColor: "text-green-300",
-  },
-  unverified: {
-    bg: "bg-yellow-100",
-    border: "border-b-2 border-yellow-400",
-    dot: "bg-yellow-400",
-    label: "Unverified Claim",
-    icon: AlertTriangle,
-    badge: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-    tooltip: "bg-yellow-950",
-    textColor: "text-yellow-300",
-  },
-  neutral: {
-    bg: "",
-    border: "",
-    dot: "bg-gray-300",
-    label: "Neutral",
-    icon: Info,
-    badge: "bg-gray-100 text-gray-600 border border-gray-200",
-    tooltip: "bg-gray-900",
-    textColor: "text-gray-300",
-  },
-};
-
-/* ─────────────────────────────────────────────
-   XAI ANNOTATION LOGIC (frontend simulation)
-   — will be replaced by RoBERTa API response
-───────────────────────────────────────────── */
-function annotateText(text: string): TextAnnotation[] {
-  if (!text || text.length < 10) return [{ text, type: "neutral" }];
-
-  // Split into sentences/phrases
-  const raw = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
-  const segments = raw.map(s => s.trim()).filter(Boolean);
-  const result: TextAnnotation[] = [];
-
-  for (const seg of segments) {
-    // ── MANIPULATIVE: sensationalism, absolutes, fear language
-    if (
-      /\b(shocking|breaking|explosive|bombshell|stunning|outrageous|unbelievable|incredible|mind-blowing|you won'?t believe|must.?see|BREAKING|SHOCKING|EXPOSED|PROOF|URGENT)\b/i.test(seg)
-    ) {
-      result.push({
-        text: seg,
-        type: "manipulative",
-        reason:
-          "Sensationalist/clickbait language detected — this pattern is strongly associated with low-credibility content and AI-generated disinformation articles.",
-        confidence: 76 + Math.floor(Math.abs(seg.length % 14)),
-      });
-    } else if (
-      /\b(always|never|everyone|nobody|completely|totally|absolutely|definitely|undoubtedly|100%|every single|no one)\b/i.test(
-        seg
-      )
-    ) {
-      result.push({
-        text: seg,
-        type: "manipulative",
-        reason:
-          "Absolutist language detected — overgeneralisation is a common rhetorical manipulation technique used to bypass critical evaluation.",
-        confidence: 70 + Math.floor(Math.abs(seg.length % 18)),
-      });
-    }
-    // ── VERIFIED: attribution, citations, data references
-    else if (
-      /\b(according to|published in|cited by|study by|researchers at|data from|evidence suggests|a report by|findings from|survey of|per cent|percent|\d+%|scientists|university|journal|institute|government)\b/i.test(
-        seg
-      )
-    ) {
-      result.push({
-        text: seg,
-        type: "verified",
-        reason:
-          "Attribution or quantitative marker detected — content references an external, potentially verifiable source. Cross-referencing with News API databases in progress.",
-        confidence: 78 + Math.floor(Math.abs(seg.length % 12)),
-      });
-    }
-    // ── UNVERIFIED: vague sourcing, hedging, speculation
-    else if (
-      /\b(some say|sources claim|reportedly|allegedly|unconfirmed|it is believed|many people|experts say|insiders|officials say|could soon|may have|might be|is expected to|anonymous sources)\b/i.test(
-        seg
-      )
-    ) {
-      result.push({
-        text: seg,
-        type: "unverified",
-        reason:
-          "Vague attribution detected — claim cannot be traced to a specific, independently verifiable source. No corroborating articles found in News API scan.",
-        confidence: 52 + Math.floor(Math.abs(seg.length % 22)),
-      });
-    }
-    // ── NEUTRAL
-    else {
-      result.push({ text: seg, type: "neutral" });
-    }
-  }
-
-  // Guarantee some variety if the entire text resolves as neutral
-  if (result.length >= 3 && result.every(r => r.type === "neutral")) {
-    result[1] = {
-      ...result[1],
-      type: "verified",
-      reason: "Declarative, structured sentence pattern — consistent with factual reporting style.",
-      confidence: 71,
-    };
-    if (result.length >= 5) {
-      result[result.length - 2] = {
-        ...result[result.length - 2],
-        type: "unverified",
-        reason:
-          "Forward-looking or predictive claim — cannot be independently verified at time of analysis.",
-        confidence: 58,
-      };
-    }
-  }
-
-  return result;
-}
-
-/* ─────────────────────────────────────────────
-   TRUTH MAP COMPONENT
-───────────────────────────────────────────── */
-function TruthMap({
-  text,
-  type,
-  xaiAnnotations,
-  resultId
-}: {
-  text: string;
-  type?: string;
-  xaiAnnotations?: TextAnnotation[];
-  resultId?: string;
-}) {
-  const [active, setActive] = useState<TextAnnotation | null>(null);
-  const [submittedHighlights, setSubmittedHighlights] = useState<string[]>([]);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const annotations = xaiAnnotations && xaiAnnotations.length > 0 ? xaiAnnotations : annotateText(text);
-
-  const counts = annotations.reduce(
-    (acc, a) => {
-      acc[a.type] = (acc[a.type] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  const handleHighlightFeedback = async (annText: string, isAccurate: boolean, correctedLabel: string) => {
-    setFeedbackLoading(true);
-    try {
-      const docId = resultId || "mock-id";
-      await veritasAPI.submitFeedback(docId, {
-        is_accurate: isAccurate,
-        corrected_label: correctedLabel,
-      });
-      setSubmittedHighlights((prev) => [...prev, annText]);
-    } catch (err) {
-      console.error("XAI feedback submit failed:", err);
-      setSubmittedHighlights((prev) => [...prev, annText]); // Fallback check in mock mode
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
-
-  if (type === "url" && (!xaiAnnotations || xaiAnnotations.length === 0)) {
-    return (
-      <div className="p-6 bg-blue-50/40 rounded-xl border border-blue-200/50 text-center text-sm text-muted-foreground">
-        <Globe className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-        <p>Truth Map is available for text-based submissions.</p>
-        <p className="mt-1 text-xs">URL content will be annotated once the backend fetching layer is connected.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        {(["manipulative", "verified", "unverified"] as const).map(t => {
-          const cfg = ANNOTATION_CONFIG[t];
-          const Icon = cfg.icon;
-          return (
-            <div key={t} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs ${cfg.badge}`}>
-              <Icon className="w-3 h-3" />
-              {cfg.label}
-              {counts[t] ? (
-                <span className="ml-1 font-semibold">{counts[t]}</span>
-              ) : (
-                <span className="ml-1 opacity-50">0</span>
-              )}
-            </div>
-          );
-        })}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-500 border border-gray-200 ml-auto">
-          <Eye className="w-3 h-3" />
-          Click highlighted text for XAI feedback options
-        </div>
-      </div>
-
-      {/* Annotated text */}
-      <div className="bg-blue-50/30 border border-blue-200/50 rounded-xl p-6 text-sm leading-8 font-serif">
-        {annotations.map((ann, idx) => {
-          if (ann.type === "neutral") {
-            return <span key={idx}>{ann.text} </span>;
-          }
-          const cfg = ANNOTATION_CONFIG[ann.type];
-          const Icon = cfg.icon;
-          const isSelected = active?.text === ann.text;
-          return (
-            <span
-              key={idx}
-              className="group/ann relative cursor-pointer"
-              onClick={() => setActive(isSelected ? null : ann)}
-            >
-              <span
-                className={`${cfg.bg} ${cfg.border} rounded-sm px-0.5 transition-all group-hover/ann:brightness-95 ${isSelected ? 'ring-2 ring-blue-500/50' : ''}`}
-              >
-                {ann.text}
-              </span>
-              {/* Tooltip */}
-              <span
-                className={`
-                  absolute bottom-full left-0 z-50 mb-2 w-72 p-3.5
-                  pointer-events-none opacity-0 group-hover/ann:opacity-100
-                  transition-opacity duration-150
-                  ${cfg.tooltip} text-white text-xs rounded-xl shadow-2xl leading-relaxed
-                `}
-              >
-                <span className={`flex items-center gap-1.5 mb-2 font-semibold ${cfg.textColor}`}>
-                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  {cfg.label}
-                  {ann.confidence && (
-                    <span className="ml-auto text-gray-400 font-normal">{ann.confidence}% confidence</span>
-                  )}
-                </span>
-                <span className="block text-gray-300 leading-relaxed">{ann.reason}</span>
-                {/* Arrow */}
-                <span className="absolute top-full left-5 border-4 border-transparent border-t-current opacity-0" />
-              </span>
-              {" "}
-            </span>
-          );
-        })}
-      </div>
-
-      {/* Active annotation detail card */}
-      <AnimatePresence>
-        {active && active.type !== "neutral" && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15 }}
-            className={`mt-4 p-4 rounded-xl border text-sm ${ANNOTATION_CONFIG[active.type].badge}`}
-          >
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start gap-2">
-                {(() => {
-                  const Icon = ANNOTATION_CONFIG[active.type].icon;
-                  return <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />;
-                })()}
-                <div>
-                  <p className="font-semibold mb-1">{ANNOTATION_CONFIG[active.type].label}</p>
-                  <p className="leading-relaxed opacity-90">{active.reason}</p>
-                  {active.confidence && (
-                    <p className="mt-1.5 text-xs opacity-70">Model confidence: {active.confidence}%</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Dynamic Feedback Block */}
-              <div className="border-t border-current/10 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
-                  Is this categorization accurate?
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {submittedHighlights.includes(active.text) ? (
-                    <span className="text-xs font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Correction registered for retraining!
-                    </span>
-                  ) : feedbackLoading ? (
-                    <span className="text-xs opacity-70 animate-pulse">Submitting correction...</span>
-                  ) : (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, true, active.type);
-                        }}
-                        className="px-2.5 py-1 bg-white/25 hover:bg-white/40 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Yes, Correct
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, false, "verified");
-                        }}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/25 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer text-[10px]"
-                      >
-                        Mark Verified
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, false, "manipulative");
-                        }}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/25 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer text-[10px]"
-                      >
-                        Mark Manipulative
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, false, "neutral");
-                        }}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/25 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer text-[10px]"
-                      >
-                        Mark Neutral
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 interface GraphNode {
   id: string;
@@ -1082,26 +724,33 @@ export function Results() {
             </div>
           </div>
 
-          {/* ── XAI TRUTH MAP ── */}
-          <div className="bg-white border border-blue-200/50 rounded-xl p-6 mb-6 clip-corner-lg">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-blue-600" />
+          {/* ── XAI TRUTH MAP: GRAMMARLY-STYLE ANNOTATION ENGINE ── */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 mb-8 clip-corner-lg shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-200/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700">
+                  <Sparkles className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3>Truth Map — XAI Phrase Analysis</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Specific phrases that influenced the Credibility Index score, surfaced by the RoBERTa XAI layer
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-lg">Truth Map — RoBERTa Explainable AI (XAI)</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase">
+                      Grammarly-Style XAI
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Sentence-level stylometric highlights, category filters, and floating finding inspection cards.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 rounded-full text-xs text-blue-700 border border-blue-200/60 flex-shrink-0">
-                <Sparkles className="w-3 h-3" />
-                XAI
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  40% Linguistic Weight
+                </span>
               </div>
             </div>
 
             <TruthMap text={text} type={type} xaiAnnotations={loadedResult?.xai_annotations} resultId={id || loadedResult?.id} />
-
           </div>
 
           {/* ── Linguistic Analysis ── */}

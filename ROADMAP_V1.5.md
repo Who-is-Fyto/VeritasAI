@@ -46,9 +46,9 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Implement smooth skeleton layout transitions to eliminate layout shifts during analysis.
 
 ### Phase 5: Accessible Credibility Gauge & Verdict
-- [ ] Redesign the primary 0-100 radial/semi-circular Credibility Index meter (PolitiFact Truth-O-Meter inspiration).
-- [ ] Incorporate animated needle/progress arc with confidence interval indicators.
-- [ ] Pair score with accessible verdict pills (Verified, Highly Credible, Caution / Questionable, Flagged as Disinformation) backed by dual icon + text markers.
+- [x] Redesign the primary 0-100 radial/semi-circular Credibility Index meter (PolitiFact Truth-O-Meter inspiration).
+- [x] Incorporate animated needle/progress arc with confidence interval indicators.
+- [x] Pair score with accessible verdict pills (Verified, Highly Credible, Caution / Questionable, Flagged as Disinformation) backed by dual icon + text markers.
 
 ### Phase 6: Source Authority "Nutrition Label"
 - [ ] Redesign the 35% Source Authority panel into an investigative "Credibility Nutrition Label" (NewsGuard inspiration).

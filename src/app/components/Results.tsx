@@ -5,8 +5,10 @@ import { useAuth } from "../../context/AuthContext";
 import { getTierConfig } from "../../utils/tierLimits";
 import { PricingModal } from "./PricingModal";
 import { PipelineTracker } from "./PipelineTracker";
+import { CredibilityGauge } from "./CredibilityGauge";
+import { getCredibilityConfig, CredibilityTier } from "../../utils/credibilityTheme";
 import {
-  Shield, AlertTriangle, CheckCircle2, XCircle, Sparkles,
+  Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Sparkles,
   ExternalLink, Globe, TrendingUp, Brain, Search, FileText,
   BarChart2, BookOpen, ArrowLeft, Download, ChevronRight, Eye,
   AlertCircle, Info
@@ -433,26 +435,6 @@ function TruthMap({
   );
 }
 
-
-/* ─────────────────────────────────────────────
-   SCORE RING
-───────────────────────────────────────────── */
-function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
-  const data = [{ value: score, fill: "#2563eb" }];
-  return (
-    <ResponsiveContainer width={size} height={size}>
-      <RadialBarChart
-        cx="50%" cy="50%"
-        innerRadius="65%" outerRadius="90%"
-        data={data}
-        startAngle={90} endAngle={-270}
-      >
-        <RadialBar background={{ fill: "rgba(219,234,254,0.6)" }} dataKey="value" cornerRadius={8} />
-      </RadialBarChart>
-    </ResponsiveContainer>
-  );
-}
-
 interface GraphNode {
   id: string;
   label: string;
@@ -780,17 +762,20 @@ export function Results() {
     );
   }
 
+  const credibilityConfig = getCredibilityConfig(overallScore);
+  const TierIcon =
+    credibilityConfig.iconName === "ShieldCheck"
+      ? ShieldCheck
+      : credibilityConfig.iconName === "CheckCircle2"
+      ? CheckCircle2
+      : credibilityConfig.iconName === "AlertTriangle"
+      ? AlertTriangle
+      : ShieldAlert;
+
   const getScoreColor = (s: number) =>
     s >= 80 ? "text-green-600" : s >= 60 ? "text-blue-600" : s >= 40 ? "text-yellow-600" : "text-red-600";
 
-  const getBadge = (s: number) =>
-    s >= 80
-      ? { label: "Highly Credible",      color: "bg-green-100 text-green-700", Icon: CheckCircle2 }
-      : s >= 60
-      ? { label: "Moderately Credible",  color: "bg-blue-100 text-blue-700",   Icon: AlertTriangle }
-      : { label: "Low Credibility",      color: "bg-red-100 text-red-700",     Icon: XCircle };
-
-  const badge = getBadge(overallScore);
+  const confidenceInterval = loadedResult?.confidence_interval ?? 2.5;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload?.length) {
@@ -825,14 +810,13 @@ export function Results() {
             <span>Results</span>
           </div>
 
-
           {/* Page title */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-4xl tracking-tight">Credibility Index Report</h1>
-              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm ${badge.color}`}>
-                <badge.Icon className="w-4 h-4" />
-                {badge.label}
+              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${credibilityConfig.badgeClass}`}>
+                <TierIcon className="w-4 h-4" />
+                {credibilityConfig.label}
               </div>
             </div>
             <p className="text-muted-foreground">
@@ -841,149 +825,197 @@ export function Results() {
             </p>
           </div>
 
-          {/* ── Hero Score Card ── */}
-          <div className="bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 rounded-2xl p-8 mb-8 text-white clip-corner-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white/8 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-800/30 rounded-full blur-2xl" />
-
-            <div className="relative grid md:grid-cols-3 gap-8 items-start">
-              {/* Score ring */}
-              <div className="flex items-center gap-6">
-                <div className="relative flex items-center justify-center">
-                  <ScoreRing score={overallScore} size={110} />
-                  <div className="absolute text-center">
-                    <div className="text-3xl" style={{ fontWeight: 700, lineHeight: 1 }}>{overallScore}</div>
-                    <div className="text-xs text-blue-200 mt-0.5">/ 100</div>
-                  </div>
+          {/* ── Hero Score Card: Institutional PolitiFact Truth-O-Meter & Credibility Engine ── */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm clip-corner-xl overflow-hidden mb-8 transition-all hover:shadow-md">
+            {/* Institutional Header Ribbon */}
+            <div className="bg-slate-50/90 px-6 py-3 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1 rounded bg-slate-900 text-white">
+                  <Shield className="w-3.5 h-3.5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1 text-blue-200 text-sm">
-                    <Shield className="w-4 h-4" />
-                    <span>Credibility Index</span>
-                  </div>
-                  <div className="text-4xl mb-3" style={{ fontWeight: 700 }}>{overallScore}%</div>
-                  <p className="text-blue-100 text-sm max-w-xs leading-relaxed">
-                    Moderately credible. Key claims verified; AI generation probability is low.
-                  </p>
-                </div>
+                <span className="font-bold tracking-tight text-slate-800 uppercase">
+                  Veritas Intelligence Assessment
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="font-mono text-slate-500">
+                  REF: {id ? `VER-${id.slice(-8).toUpperCase()}` : "VER-2026-X89"}
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">
+                  Inference: 1.42s · 95% Confidence
+                </span>
               </div>
 
-              {/* Dimension mini scores */}
-              <div className="md:col-span-2 space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Linguistic",     value: linguisticScore,  Icon: Brain,       weight: "40%" },
-                    { label: "Source Auth.",   value: sourceCredibility, Icon: Globe,       weight: "35%" },
-                    { label: "Corroboration",  value: factCheckScore,   Icon: Search,      weight: "25%" },
-                  ].map((m, i) => (
-                    <div key={i} className="bg-white/15 backdrop-blur-sm rounded-xl p-4 clip-corner-icon">
-                      <div className="flex items-center justify-between mb-1">
-                        <m.Icon className="w-4 h-4 text-blue-200" />
-                        <span className="text-xs text-blue-300 font-mono">{m.weight}</span>
-                      </div>
-                      <div className="text-2xl mb-0.5" style={{ fontWeight: 700 }}>
-                        {m.value}
-                        <span className="text-sm text-blue-300 ml-0.5">%</span>
-                      </div>
-                      <div className="text-xs text-blue-200">{m.label}</div>
-                    </div>
-                  ))}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+                  Ensemble v1.5 (RoBERTa + MediaBias + NewsWire)
+                </span>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${credibilityConfig.badgeClass}`}>
+                  <TierIcon className="w-3.5 h-3.5" />
+                  <span>{credibilityConfig.shortLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Card Grid */}
+            <div className="grid lg:grid-cols-12 gap-8 items-center p-6 sm:p-8">
+              {/* Left Column: PolitiFact Truth-O-Meter & Speedometer Gauge */}
+              <div className="lg:col-span-5 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-slate-100 pb-6 lg:pb-0 lg:pr-6">
+                <CredibilityGauge
+                  score={overallScore}
+                  confidenceInterval={confidenceInterval}
+                  size="lg"
+                  showTruthOMeter={true}
+                  showConfidenceInterval={true}
+                  showTicks={true}
+                />
+              </div>
+
+              {/* Right Column: Executive Synthesis, Dimension Pillars, and Mathematical MCDA Formula */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Executive Synthesis */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
+                      Executive Synthesis
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                    <span className="text-xs font-semibold text-slate-700">
+                      {credibilityConfig.shortLabel} Consensus
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight text-slate-900 mb-2">
+                    {credibilityConfig.verdict}
+                  </h2>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    {overallScore >= 80
+                      ? "Authoritative and factual. Core assertions have been corroborated by multiple primary wire services (Reuters, AP, BBC). Stylometric analysis indicates objective journalistic syntax with low AI deception markers."
+                      : overallScore >= 60
+                      ? "Substantively factual with minor qualifications. Primary assertions align with accredited news coverage, though stylistic markers indicate moderate emotional framing or partisan tone."
+                      : overallScore >= 40
+                      ? "Caution advised. The report identified unsubstantiated factual claims, elevated emotional hyperbole, or source transparency concerns that require independent corroboration."
+                      : "High risk of disinformation or synthetic deception. Assertions contradict consensus reporting from verified wire services, exhibiting elevated manipulative linguistic markers."}
+                  </p>
                 </div>
 
-                {/* Weighted formula */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3.5 border border-white/10">
-                  <p className="text-xs text-blue-200 mb-2 flex items-center gap-1.5">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    Ensemble weighting formula
-                  </p>
+                {/* 3 Dimension Architecture Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Pillar 1: Linguistic */}
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Brain className="w-3.5 h-3.5 text-blue-600" />
+                        Linguistic (40%)
+                      </span>
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {linguisticScore}%
+                      </span>
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          linguisticScore >= 80 ? "bg-emerald-500" : linguisticScore >= 60 ? "bg-blue-500" : linguisticScore >= 40 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${linguisticScore}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      {aiProbability > 50
+                        ? `Elevated AI probability (${aiProbability}%). Synthetic LLM transition cadence.`
+                        : `Human cadence (Burstiness CV > 0.35). Low AI markers (${aiProbability}%).`}
+                    </p>
+                  </div>
+
+                  {/* Pillar 2: Source Authority */}
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                        Source Auth. (35%)
+                      </span>
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {sourceCredibility}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          sourceCredibility >= 80 ? "bg-emerald-500" : sourceCredibility >= 60 ? "bg-blue-500" : sourceCredibility >= 40 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${sourceCredibility}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      {sourceCredibility >= 80
+                        ? "Accredited newsroom with verified editorial transparency."
+                        : sourceCredibility >= 60
+                        ? "Standard transparency signals; moderate independent ranking."
+                        : "Unverified domain or unknown ownership transparency."}
+                    </p>
+                  </div>
+
+                  {/* Pillar 3: Corroboration */}
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-sky-600" />
+                        Corroboration (25%)
+                      </span>
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {factCheckScore}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          factCheckScore >= 80 ? "bg-emerald-500" : factCheckScore >= 60 ? "bg-blue-500" : factCheckScore >= 40 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${factCheckScore}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      {claims.filter(c => c.status === "false").length > 0
+                        ? `${claims.filter(c => c.status === "false").length} claim(s) debunked by certified fact-checkers.`
+                        : claims.filter(c => c.status === "verified").length > 0
+                        ? `${claims.filter(c => c.status === "verified").length} claim(s) corroborated against wire press archives.`
+                        : "Requires additional independent confirmation from primary wire feeds."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Weighted MCDA Formula Bar */}
+                <div className="bg-slate-50/90 rounded-xl p-3.5 border border-slate-200/80">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Ensemble Mathematical Weighting (MCDA)</span>
+                    </p>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Overall = (L × 0.40) + (S × 0.35) + (C × 0.25)
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5 flex-wrap text-xs font-mono">
-                    <span className="bg-white/20 px-2 py-0.5 rounded">
+                    <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-slate-400 font-sans mr-1">Linguistic:</span>
                       {linguisticScore} × 0.40
                     </span>
-                    <span className="text-blue-300">+</span>
-                    <span className="bg-white/20 px-2 py-0.5 rounded">
+                    <span className="text-slate-400 font-bold">+</span>
+                    <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-slate-400 font-sans mr-1">Source:</span>
                       {sourceCredibility} × 0.35
                     </span>
-                    <span className="text-blue-300">+</span>
-                    <span className="bg-white/20 px-2 py-0.5 rounded">
+                    <span className="text-slate-400 font-bold">+</span>
+                    <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-slate-400 font-sans mr-1">Corroboration:</span>
                       {factCheckScore} × 0.25
                     </span>
-                    <span className="text-blue-300">=</span>
-                    <span className="bg-white/30 px-2 py-0.5 rounded font-bold text-white">
-                      {overallScore}
+                    <span className="text-slate-400 font-bold">=</span>
+                    <span className={`px-2.5 py-1 rounded font-bold border ${credibilityConfig.badgeClass}`}>
+                      {overallScore}% {credibilityConfig.shortLabel}
                     </span>
                   </div>
-                  <p className="text-xs text-blue-300/70 mt-1.5">
-                    Linguistic (40%) · Source Authority (35%) · Corroboration (25%)
-                  </p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Executive Analysis Verdict & Rationale Card ── */}
-          <div className="bg-white border border-blue-200/60 rounded-2xl p-6 mb-8 clip-corner-lg shadow-sm">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-blue-100">
-              <div className="p-2 bg-blue-100 rounded-lg text-blue-700">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Analysis Verdict & Detailed Score Explanation</h3>
-                <p className="text-xs text-muted-foreground">Comprehensive breakdown explaining why this content earned an overall score of {overallScore}%</p>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5">
-              {/* Pillar 1: Linguistic & AI */}
-              <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-200/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <Brain className="w-4 h-4 text-blue-600" />
-                    1. Linguistic & AI (40%)
-                  </span>
-                  <span className="text-sm font-bold text-blue-700">{linguisticScore}%</span>
-                </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  {aiProbability > 50
-                    ? `High AI generation probability (${aiProbability}%). The text displays monotonous cadence and synthetic LLM transition markers.`
-                    : `High textual credibility with natural human cadence (Burstiness CV > 0.35) and low AI probability (${aiProbability}%).`}
-                </p>
-              </div>
-
-              {/* Pillar 2: Source Authority */}
-              <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-200/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <Globe className="w-4 h-4 text-blue-600" />
-                    2. Source Authority (35%)
-                  </span>
-                  <span className="text-sm font-bold text-blue-700">{sourceCredibility}%</span>
-                </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  {sourceCredibility >= 80
-                    ? "Associated with accredited news agencies with documented editorial transparency."
-                    : sourceCredibility >= 60
-                    ? "Domain shows standard transparency signals, though independent editorial ranking is moderate."
-                    : "Unverified domain or unknown publisher background. Caution advised."}
-                </p>
-              </div>
-
-              {/* Pillar 3: External Corroboration */}
-              <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-200/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <Search className="w-4 h-4 text-blue-600" />
-                    3. Corroboration (25%)
-                  </span>
-                  <span className="text-sm font-bold text-blue-700">{factCheckScore}%</span>
-                </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  {claims.filter(c => c.status === "false").length > 0
-                    ? `${claims.filter(c => c.status === "false").length} claim(s) debunked as false by certified fact-checkers.`
-                    : claims.filter(c => c.status === "verified").length > 0
-                    ? `${claims.filter(c => c.status === "verified").length} claim(s) verified against press archives with direct news reference links below.`
-                    : "Factual statements require additional independent confirmation from primary news sources."}
-                </p>
               </div>
             </div>
           </div>

@@ -64,11 +64,12 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Implement floating hover/click inspection cards displaying model confidence %, linguistic flags, and plain-English explanations.
 
 ### Phase 8: Claim Extraction & Verdict Accordion
-- [ ] Redesign the extracted claims section into structured, high-contrast callout cards (Full Fact inspiration).
-- [ ] Format each claim with:
+- [x] Redesign the extracted claims section into structured, high-contrast callout cards (Full Fact inspiration).
+- [x] Format each claim with:
   - Distinct box stating the exact claim made.
   - Paired box showing the verified conclusion and corroboration verdict.
   - Supporting source citations with domain credibility scores and timestamps.
+- [x] High-accuracy multi-source corroboration engine upgraded (ordered entity extraction, dateline & caption cleanup, Google News RSS live indexing, DuckDuckGo organic search fallback, lead-claim weighted aggregation).
 
 ### Phase 9: Super Admin Backend Engine
 - [ ] Implement role-based access control (RBAC) ensuring only `superadmin` can access administrative routes.

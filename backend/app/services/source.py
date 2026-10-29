@@ -60,6 +60,7 @@ KNOWN_SOURCES = {
     "cbc.ca": {"name": "CBC News", "credibility": 89.0, "status": "verified"},
 
     # ── South African & Regional African Media (85–92) ──
+    "enca.com": {"name": "eNCA (e.tv News & Current Affairs)", "credibility": 89.0, "status": "verified"},
     "news24.com": {"name": "News24", "credibility": 89.0, "status": "verified"},
     "dailymaverick.co.za": {"name": "Daily Maverick", "credibility": 91.0, "status": "verified"},
     "mg.co.za": {"name": "Mail & Guardian", "credibility": 90.0, "status": "verified"},
@@ -128,6 +129,7 @@ KNOWN_SOURCES = {
     "the guardian": {"name": "The Guardian", "credibility": 89.0, "status": "verified"},
     "financial times": {"name": "Financial Times", "credibility": 92.0, "status": "verified"},
     "daily maverick": {"name": "Daily Maverick", "credibility": 91.0, "status": "verified"},
+    "enca": {"name": "eNCA", "credibility": 89.0, "status": "verified"},
     "news24": {"name": "News24", "credibility": 89.0, "status": "verified"},
     "mail & guardian": {"name": "Mail & Guardian", "credibility": 90.0, "status": "verified"},
     "business day": {"name": "Business Day", "credibility": 89.0, "status": "verified"},

@@ -51,8 +51,8 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Pair score with accessible verdict pills (Verified, Highly Credible, Caution / Questionable, Flagged as Disinformation) backed by dual icon + text markers.
 
 ### Phase 6: Source Authority "Nutrition Label"
-- [ ] Redesign the 35% Source Authority panel into an investigative "Credibility Nutrition Label" (NewsGuard inspiration).
-- [ ] Implement interactive checklist cards evaluating publisher criteria:
+- [x] Redesign the 35% Source Authority panel into an investigative "Credibility Nutrition Label" (NewsGuard inspiration).
+- [x] Implement interactive checklist cards evaluating publisher criteria:
   - Editorial transparency and masthead disclosure.
   - Correction regularity and retraction handling.
   - Ownership transparency and political bias classification.

@@ -6,6 +6,7 @@ import { getTierConfig } from "../../utils/tierLimits";
 import { PricingModal } from "./PricingModal";
 import { PipelineTracker } from "./PipelineTracker";
 import { CredibilityGauge } from "./CredibilityGauge";
+import { SourceNutritionLabel } from "./SourceNutritionLabel";
 import { getCredibilityConfig, CredibilityTier } from "../../utils/credibilityTheme";
 import {
   Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Sparkles,
@@ -1309,40 +1310,10 @@ export function Results() {
               </div>
             </div>
 
-            <div className="bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
-              <div className="flex items-center gap-2 mb-6">
-                <BookOpen className="w-5 h-5 text-blue-600" />
-                <h3>Source Authority</h3>
-              </div>
-              <div className="space-y-3">
-                {sources.map((source, i) => (
-                  <div key={i} className="group flex items-center gap-4 p-4 border border-blue-200/40 rounded-lg hover:border-blue-300 transition-all bg-blue-50/20">
-                    <div className={`p-2 rounded-lg flex-shrink-0 clip-corner-icon ${source.credibility >= 80 ? "bg-green-100" : source.credibility >= 60 ? "bg-blue-100" : "bg-yellow-100"}`}>
-                      <Globe className={`w-4 h-4 ${source.credibility >= 80 ? "text-green-600" : source.credibility >= 60 ? "text-blue-600" : "text-yellow-600"}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm" style={{ fontWeight: 500 }}>{source.name}</span>
-                        {source.status === "verified" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${source.credibility >= 80 ? "bg-green-500" : source.credibility >= 60 ? "bg-blue-500" : "bg-yellow-500"}`}
-                            style={{ width: `${source.credibility}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{source.credibility}%</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{source.matches} match{source.matches > 1 ? "es" : ""}</span>
-                      <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SourceNutritionLabel
+              sources={sources}
+              overallSourceScore={sourceCredibility}
+            />
           </div>
 
 

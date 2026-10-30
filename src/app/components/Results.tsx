@@ -16,7 +16,7 @@ import {
   Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Sparkles,
   ExternalLink, Globe, TrendingUp, Brain, Search, FileText,
   BarChart2, BookOpen, ArrowLeft, Download, ChevronRight, Eye,
-  AlertCircle, Info
+  AlertCircle, Info, Award
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {

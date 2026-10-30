@@ -25,10 +25,13 @@ _client: AsyncIOMotorClient | None = None
 async def connect_db() -> None:
     """Open the Motor connection pool. Called in the FastAPI lifespan."""
     global _client
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
-    # Force a ping to validate the connection before the app starts serving
-    await _client.admin.command("ping")
-    logger.info("MongoDB connected — %s / %s", settings.mongodb_uri, settings.mongodb_db_name)
+    try:
+        _client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
+        # Validate the connection before serving
+        await _client.admin.command("ping")
+        logger.info("MongoDB connected — %s / %s", settings.mongodb_uri, settings.mongodb_db_name)
+    except Exception as e:
+        logger.error("Initial MongoDB ping failed (%s). Motor will retry on first query: %s", settings.mongodb_uri, e)
 
 
 async def close_db() -> None:
@@ -36,12 +39,15 @@ async def close_db() -> None:
     global _client
     if _client:
         _client.close()
+        _client = None
         logger.info("MongoDB connection closed.")
 
 
 def get_client() -> AsyncIOMotorClient:
+    global _client
     if _client is None:
-        raise RuntimeError("MongoDB client is not initialised. Did app startup run?")
+        logger.warning("Motor client was None. Connecting on-demand to %s", settings.mongodb_uri)
+        _client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
     return _client
 
 

@@ -209,39 +209,48 @@ async def register(
     body: UserRegister,
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> TokenResponse:
-    # 1. Check if user already exists (case-insensitive & trimmed)
-    clean_email = body.email.strip().lower()
-    existing_user = await db["users"].find_one({"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}})
-    if existing_user:
+    try:
+        # 1. Check if user already exists (case-insensitive & trimmed)
+        clean_email = body.email.strip().lower()
+        existing_user = await db["users"].find_one({"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}})
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email address already exists."
+            )
+
+        # 2. Hash password and save user
+        user_id = str(uuid.uuid4())
+        hashed_password = get_password_hash(body.password)
+        joined_time = datetime.now(timezone.utc)
+
+        aff = resolve_user_affiliation(clean_email)
+        user_doc = {
+            "_id": user_id,
+            "email": clean_email,
+            "password": hashed_password,
+            "name": body.name.strip(),
+            "institution": body.institution.strip() if body.institution else aff["institution"],
+            "role": body.role.strip() if body.role else aff["role"],
+            "student_id": body.student_id.strip() if body.student_id else aff["student_id"],
+            "account_type": aff["account_type"],
+            "joined_at": joined_time
+        }
+        await db["users"].insert_one(user_doc)
+        logger.info("New user registered: %s (%s)", body.email, user_id)
+
+        # 3. Issue token
+        token = create_access_token(user_id)
+        user_res = build_user_response(user_doc)
+        return TokenResponse(access_token=token, user=user_res)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Registration failed with unexpected error: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email address already exists."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration error: {str(e)}"
         )
-
-    # 2. Hash password and save user
-    user_id = str(uuid.uuid4())
-    hashed_password = get_password_hash(body.password)
-    joined_time = datetime.now(timezone.utc)
-
-    aff = resolve_user_affiliation(clean_email)
-    user_doc = {
-        "_id": user_id,
-        "email": clean_email,
-        "password": hashed_password,
-        "name": body.name.strip(),
-        "institution": body.institution.strip() if body.institution else aff["institution"],
-        "role": body.role.strip() if body.role else aff["role"],
-        "student_id": body.student_id.strip() if body.student_id else aff["student_id"],
-        "account_type": aff["account_type"],
-        "joined_at": joined_time
-    }
-    await db["users"].insert_one(user_doc)
-    logger.info("New user registered: %s (%s)", body.email, user_id)
-
-    # 3. Issue token
-    token = create_access_token(user_id)
-    user_res = build_user_response(user_doc)
-    return TokenResponse(access_token=token, user=user_res)
 
 
 # ── POST /api/v1/auth/login ──────────────────────────────────────────────
@@ -255,35 +264,44 @@ async def login(
     body: UserLogin,
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> TokenResponse:
-    # 1. Fetch user by email (case-insensitive & trimmed)
-    clean_email = body.email.strip()
-    user_doc = await db["users"].find_one({"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}})
-    if not user_doc:
+    try:
+        # 1. Fetch user by email (case-insensitive & trimmed)
+        clean_email = body.email.strip()
+        user_doc = await db["users"].find_one({"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}})
+        if not user_doc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password."
+            )
+
+        # 2. Verify hashed password
+        if not verify_password(body.password, user_doc["password"]):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password."
+            )
+
+        if user_doc.get("is_suspended"):
+            reason = user_doc.get("suspension_reason") or "Administrative safety lock."
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Account suspended by system administrator: {reason}"
+            )
+
+        logger.info("User logged in successfully: %s", body.email)
+
+        # 3. Issue token
+        token = create_access_token(user_doc["_id"])
+        user_res = build_user_response(user_doc)
+        return TokenResponse(access_token=token, user=user_res)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Login failed with unexpected error: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login error: {str(e)}"
         )
-
-    # 2. Verify hashed password
-    if not verify_password(body.password, user_doc["password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password."
-        )
-
-    if user_doc.get("is_suspended"):
-        reason = user_doc.get("suspension_reason") or "Administrative safety lock."
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Account suspended by system administrator: {reason}"
-        )
-
-    logger.info("User logged in successfully: %s", body.email)
-
-    # 3. Issue token
-    token = create_access_token(user_doc["_id"])
-    user_res = build_user_response(user_doc)
-    return TokenResponse(access_token=token, user=user_res)
 
 
 # ── GET /api/v1/auth/me ──────────────────────────────────────────────────

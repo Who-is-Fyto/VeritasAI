@@ -72,10 +72,10 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] High-accuracy multi-source corroboration engine upgraded (ordered entity extraction, dateline & caption cleanup, Google News RSS live indexing, DuckDuckGo organic search fallback, lead-claim weighted aggregation).
 
 ### Phase 9: Super Admin Backend Engine
-- [ ] Implement role-based access control (RBAC) ensuring only `superadmin` can access administrative routes.
-- [ ] Build User Management APIs in `backend/app/routers/admin.py` (user listing, search/filter, tier modification, account suspension).
-- [ ] Build Database Telemetry APIs (collection stats, document counts, storage utilization, query latency).
-- [ ] Build System Audit Log endpoints.
+- [x] Implement role-based access control (RBAC) ensuring only `superadmin` can access administrative routes.
+- [x] Build User Management APIs in `backend/app/routers/admin.py` (user listing, search/filter, tier modification, account suspension).
+- [x] Build Database Telemetry APIs (collection stats, document counts, storage utilization, query latency).
+- [x] Build System Audit Log endpoints.
 
 ### Phase 10: Super Admin Management Dashboard (UI)
 - [ ] Build dedicated `/admin` dashboard route with role protection.

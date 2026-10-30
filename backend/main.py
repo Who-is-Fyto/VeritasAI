@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db.mongodb import connect_db, close_db
+from app.db.mongodb import connect_db, close_db, get_db
 from app.routers import health, analysis, auth, admin
 
 
@@ -33,6 +33,10 @@ async def lifespan(app: FastAPI):
     # ── STARTUP ──────────────────────────────────────────────────────────
     logger.info("VeritasAI v%s starting up…", settings.app_version)
     await connect_db()
+    try:
+        await admin.ensure_superadmin_seeded(get_db())
+    except Exception as e:
+        logger.warning("Could not run superadmin bootstrap: %s", e)
     # Model is already instantiated as a module-level singleton in
     # linguistic.py — no additional loading needed here unless you want
     # to pre-warm it with a dummy inference pass.

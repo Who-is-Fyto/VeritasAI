@@ -128,6 +128,13 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if user_doc.get("is_suspended"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended by system administrator. Please contact oversight.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return build_user_response(user_doc)
 
 
@@ -262,6 +269,13 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password."
+        )
+
+    if user_doc.get("is_suspended"):
+        reason = user_doc.get("suspension_reason") or "Administrative safety lock."
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account suspended by system administrator: {reason}"
         )
 
     logger.info("User logged in successfully: %s", body.email)

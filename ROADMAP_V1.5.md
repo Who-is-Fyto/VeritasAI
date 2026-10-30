@@ -99,8 +99,8 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Ensure Sonner toast notifications, dialog accessibility, and responsive layouts across all mobile and desktop viewports.
 
 ### Phase 14: Verification, Automated Testing, and Examiner Defense Preparation
-- [ ] Write unit/integration tests for form validation, strict email rules, backup endpoints, and admin RBAC.
-- [ ] Compile an Examiner Defense Quick Reference Guide highlighting key architectural decisions, validation workflows, and database recovery procedures.
+- [x] Write unit/integration tests for form validation, strict email rules, backup endpoints, and admin RBAC.
+- [x] Compile an Examiner Defense Quick Reference Guide highlighting key architectural decisions, validation workflows, and database recovery procedures.
 
 ### Phase 15: Deep AI Text Detection & Forensic Stylometrics Engine
 - [ ] Upgrade backend neural checkpoint in `backend/app/config.py` from raw `roberta-base` to a fine-tuned AI text detection model (`Hello-SimpleAI/chatgpt-detector-roberta` / `roberta-base-openai-detector`).

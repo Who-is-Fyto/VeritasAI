@@ -41,7 +41,7 @@ ACTION_ROOTS = [
     "arrest", "jail", "detain", "charg", "indict", "die", "death", "dead", "pass", "resign",
     "ban", "invad", "collaps", "elect", "fraud", "stole", "steal", "kill",
     "fire", "bomb", "strike", "sue", "lawsuit", "crash", "shoot", "attack",
-    "bankrupt", "buy", "bought", "sell", "sold", "warm", "temperat",
+    "bankrupt", "buy", "bought", "sell", "sold", "purchas", "sail", "warm", "temperat",
     "cancer", "diagnos", "ill", "hospit", "surger", "diseas", "vote", "poll", "ballot"
 ]
 
@@ -376,7 +376,7 @@ class CorroborationService:
                 if not clean_title:
                     clean_title = raw_title
 
-                if not self._is_claim_relevant(claim, clean_title, min_sim=0.16):
+                if not self._is_claim_relevant(claim, clean_title, min_sim=0.35):
                     continue
 
                 sim = self._compute_overlap(claim, clean_title)
@@ -424,7 +424,7 @@ class CorroborationService:
                     continue
 
                 combined_candidate = f"{title} {snippet}"
-                if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.18):
+                if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.35):
                     continue
 
                 # Deduce publisher name from domain
@@ -444,7 +444,7 @@ class CorroborationService:
             logger.debug("DuckDuckGo search failed for '%s': %s", query, e)
             return []
 
-    def _is_claim_relevant(self, claim: str, candidate_text: str, min_sim: float = 0.16) -> bool:
+    def _is_claim_relevant(self, claim: str, candidate_text: str, min_sim: float = 0.35) -> bool:
         """
         Semantic overlap, predicate alignment, and subject anchoring safeguard:
         Verifies that candidate text is genuinely reporting on the same assertion
@@ -478,15 +478,30 @@ class CorroborationService:
         intersection = stems1.intersection(stems2)
         sim = len(intersection) / len(stems1)
 
-        if sim < min_sim:
+        # 2. Non-Entity Substantive Stem Overlap Check:
+        # If candidate only overlaps on the subject entity name (e.g., 'pope'), that is NOT enough to claim relevance
+        if actors:
+            actor_stems = set()
+            for a in actors:
+                for tok in a.split():
+                    actor_stems.add(_stem(tok.lower()))
+
+            non_actor_stems1 = stems1 - actor_stems
+            non_actor_intersection = intersection - actor_stems
+
+            if non_actor_stems1 and not non_actor_intersection:
+                return False
+
+        effective_min_sim = max(min_sim, 0.35 if len(stems1) >= 5 else 0.28)
+        if sim < effective_min_sim:
             return False
 
-        # Action / Predicate alignment check
+        # 3. Action / Predicate alignment check
         claim_actions = [root for root in ACTION_ROOTS if any(w.startswith(root) for w in stems1)]
         cand_actions = [root for root in ACTION_ROOTS if any(w.startswith(root) for w in stems2)]
 
-        if claim_actions:
-            if not any(a in cand_actions for a in claim_actions) and sim < 0.40:
+        if claim_actions or cand_actions:
+            if not any(a in cand_actions for a in claim_actions) and sim < 0.35:
                 return False
 
         return True

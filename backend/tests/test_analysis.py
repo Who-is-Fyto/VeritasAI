@@ -168,7 +168,7 @@ async def test_corroboration_subject_actor_anchoring_safeguard():
     """Verify that claims about one entity (the Pope) cannot be corroborated by articles about an unrelated third party."""
     from app.services.corroboration import corroboration_service
 
-    claim = "The pope has been diagnosed with a rare cancer and could have as little as one year left to live"
+    claim = "The pope has secretly purchased a luxury superyacht and sailed to the Caribbean"
     unrelated_candidate = (
         "BBC presenter Maryam Moshiri determined to 'get on with it' despite feeling like her 'battery has been taken out' "
         "amid battle with incurable blood cancer. Moshiri was diagnosed with polycythaemia vera, a rare cancer."
@@ -178,7 +178,7 @@ async def test_corroboration_subject_actor_anchoring_safeguard():
     is_rel = corroboration_service._is_claim_relevant(claim, unrelated_candidate)
     assert is_rel is False
 
-    # 2. Live verification must NOT falsely verify the Pope cancer rumor
+    # 2. Live verification must NOT falsely verify the Pope superyacht rumor
     res = await corroboration_service.analyse(claim)
     assert len(res.claims) > 0
     assert res.claims[0].status != "verified"

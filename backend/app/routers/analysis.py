@@ -173,6 +173,7 @@ async def analyse(
         linguistic_flags=linguistic_result.flags,
         summary=_build_summary(overall),
         content=content_to_analyse,
+        ai_forensics=linguistic_result.ai_forensics,
     )
 
     # ── Persist to MongoDB ───────────────────────────────────────────────

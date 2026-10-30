@@ -64,6 +64,28 @@ export interface WeightedScores {
   };
 }
 
+export interface SentenceAIScore {
+  sentence_index: number;
+  text: string;
+  ai_probability: number;
+  classification: "human" | "mixed" | "synthetic";
+  burstiness: number;
+  perplexity_score: number;
+  detected_markers: string[];
+}
+
+export interface ForensicStylometrics {
+  burstiness_score: number;
+  burstiness_classification: "low_burstiness" | "moderate" | "high_burstiness";
+  perplexity_estimate: number;
+  perplexity_classification: "highly_predictable" | "moderate" | "natural_unpredictable";
+  lexical_diversity: number;
+  shannon_entropy: number;
+  synthetic_marker_count: number;
+  synthetic_markers_found: string[];
+  sentence_analyses: SentenceAIScore[];
+}
+
 /** Full analysis result returned by POST /api/v1/analyse */
 export interface AnalysisResult {
   id: string;
@@ -81,6 +103,8 @@ export interface AnalysisResult {
   linguistic_flags: LinguisticFlag[];
   /** One-sentence human-readable summary of the result */
   summary: string;
+  /** Deep AI Text Detection & Forensic Stylometrics breakdown */
+  ai_forensics?: ForensicStylometrics;
 }
 
 /** Payload for POST /api/v1/analyse */

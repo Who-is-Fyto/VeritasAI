@@ -10,6 +10,7 @@ import { CredibilityGauge } from "./CredibilityGauge";
 import { SourceNutritionLabel } from "./SourceNutritionLabel";
 import { ClaimsAccordion } from "./ClaimsAccordion";
 import { TruthMap } from "./TruthMap";
+import { ForensicStylometricsPanel } from "./ForensicStylometricsPanel";
 import { getCredibilityConfig, CredibilityTier } from "../../utils/credibilityTheme";
 import {
   Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Sparkles,
@@ -739,11 +740,36 @@ export function Results() {
                   </div>
                   <span className="text-yellow-600" style={{ fontWeight: 600 }}>{aiProbability}%</span>
                 </div>
-                <div className="mt-4 p-3 bg-green-50 border border-green-200/50 rounded-lg text-xs text-green-700 leading-relaxed">
-                  Low AI generation probability. Content shows stylometric markers consistent with human authorship.
+                <div className={`mt-4 p-3 rounded-lg text-xs leading-relaxed ${
+                  aiProbability > 65
+                    ? "bg-rose-50 border border-rose-200/50 text-rose-800"
+                    : aiProbability > 35
+                    ? "bg-amber-50 border border-amber-200/50 text-amber-800"
+                    : "bg-green-50 border border-green-200/50 text-green-700"
+                }`}>
+                  {aiProbability > 65
+                    ? "High AI generation probability. Content exhibits synthetic transitional markers and uniform sentence cadence."
+                    : aiProbability > 35
+                    ? "Mixed / hybrid generation probability. Portions show automated stylometric signatures."
+                    : "Low AI generation probability. Content shows stylometric markers consistent with human authorship."}
                 </div>
+                <a
+                  href="#forensic-stylometrics-section"
+                  className="mt-2 block text-center py-1.5 px-3 rounded-md bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors"
+                >
+                  Inspect Sentence Heatmap & Metrics →
+                </a>
               </div>
             </div>
+          </div>
+
+          {/* ── FORENSIC STYLOMETRICS & DEEP AI DETECTION HEATMAP ── */}
+          <div id="forensic-stylometrics-section">
+            <ForensicStylometricsPanel
+              forensics={loadedResult?.ai_forensics}
+              aiProbability={aiProbability}
+              rawText={loadedResult?.content || text}
+            />
           </div>
 
           {/* ── XAI TRUTH MAP: GRAMMARLY-STYLE ANNOTATION ENGINE ── */}

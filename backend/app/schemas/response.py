@@ -61,6 +61,30 @@ class WeightedScores(BaseModel):
     weights: dict[str, float]  = {"linguistic": 0.40, "source": 0.35, "corroboration": 0.25}
 
 
+class SentenceAIScore(BaseModel):
+    """Granular sentence-level AI score and forensic metrics."""
+    sentence_index: int
+    text: str
+    ai_probability: float = Field(..., ge=0, le=100)
+    classification: str   # "human" | "mixed" | "synthetic"
+    burstiness: float
+    perplexity_score: float
+    detected_markers: list[str] = []
+
+
+class ForensicStylometrics(BaseModel):
+    """Deep forensic stylometrics and token-level information entropy signals."""
+    burstiness_score: float
+    burstiness_classification: str
+    perplexity_estimate: float
+    perplexity_classification: str
+    lexical_diversity: float
+    shannon_entropy: float
+    synthetic_marker_count: int
+    synthetic_markers_found: list[str] = []
+    sentence_analyses: list[SentenceAIScore] = []
+
+
 class AnalysisResult(BaseModel):
     """Full response returned by POST /api/v1/analyse and GET /api/v1/results/:id"""
     id: str
@@ -76,6 +100,7 @@ class AnalysisResult(BaseModel):
     linguistic_flags: list[LinguisticFlag] = []
     summary: str = ""
     content: str = ""
+    ai_forensics: Optional[ForensicStylometrics] = None
 
 
 class HealthResponse(BaseModel):

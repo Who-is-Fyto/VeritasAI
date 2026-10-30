@@ -514,6 +514,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       const corrobScore = isSuspect ? 36.0 : 80.0;
       const aiProb = isSuspect ? 78.0 : 14.0;
 
+      const sentences = content.split(/(?<=[.!?])\s+/).filter(Boolean);
+      const sentenceAnalyses = sentences.map((s, idx) => {
+        const isSynthetic = isSuspect && idx % 2 === 0;
+        const sProb = isSynthetic ? 84.0 : (isSuspect ? 55.0 : 12.0);
+        return {
+          sentence_index: idx,
+          text: s,
+          ai_probability: sProb,
+          classification: (sProb >= 65 ? "synthetic" : sProb >= 35 ? "mixed" : "human") as "synthetic" | "mixed" | "human",
+          burstiness: 0.28,
+          perplexity_score: isSynthetic ? 82.0 : 24.0,
+          detected_markers: isSynthetic ? ["delve into", "testament to"] : [],
+        };
+      });
+
       const mockAnalysisResult: AnalysisResult = {
         id: docId,
         status: "complete",
@@ -574,6 +589,27 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
           ? "Content contains severe manipulation markers and unverified assertions."
           : "Content is highly credible and corroborated by authoritative news wires.",
         content: content,
+        ai_forensics: {
+          burstiness_score: isSuspect ? 18.5 : 56.4,
+          burstiness_classification: isSuspect ? "low_burstiness" : "high_burstiness",
+          perplexity_estimate: isSuspect ? 78.0 : 26.0,
+          perplexity_classification: isSuspect ? "highly_predictable" : "natural_unpredictable",
+          lexical_diversity: isSuspect ? 0.44 : 0.69,
+          shannon_entropy: isSuspect ? 3.5 : 5.9,
+          synthetic_marker_count: isSuspect ? 4 : 0,
+          synthetic_markers_found: isSuspect ? ["delve into", "rich tapestry", "testament to", "it is worth noting"] : [],
+          sentence_analyses: sentenceAnalyses.length > 0 ? sentenceAnalyses : [
+            {
+              sentence_index: 0,
+              text: content || "Sample statement",
+              ai_probability: aiProb,
+              classification: aiProb >= 65 ? "synthetic" : aiProb >= 35 ? "mixed" : "human",
+              burstiness: 0.3,
+              perplexity_score: isSuspect ? 75.0 : 22.0,
+              detected_markers: isSuspect ? ["delve into"] : []
+            }
+          ]
+        }
       };
 
       try {

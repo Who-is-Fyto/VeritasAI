@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "veritasai"
 
-    # Model
-    model_path: str = "roberta-base"   # swap for fine-tuned checkpoint later
+    # Models
+    model_path: str = "roberta-base"   # sequence classification / linguistic credibility checkpoint
+    ai_detector_model_path: str = "Hello-SimpleAI/chatgpt-detector-roberta"  # fine-tuned AI detection checkpoint
+    enable_neural_ai_detector: bool = False  # opt-in neural detector; defaults to zero-storage forensic stylometrics
     device: str = "cpu"
 
     # JWT Authentication

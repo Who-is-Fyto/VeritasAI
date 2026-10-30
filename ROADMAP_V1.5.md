@@ -103,10 +103,10 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Compile an Examiner Defense Quick Reference Guide highlighting key architectural decisions, validation workflows, and database recovery procedures.
 
 ### Phase 15: Deep AI Text Detection & Forensic Stylometrics Engine
-- [ ] Upgrade backend neural checkpoint in `backend/app/config.py` from raw `roberta-base` to a fine-tuned AI text detection model (`Hello-SimpleAI/chatgpt-detector-roberta` / `roberta-base-openai-detector`).
-- [ ] Implement multi-signal stylometrics in `backend/app/services/linguistic.py` (sentence-level burstiness variance, log-likelihood perplexity estimation, type-token lexical richness, and expanded 120+ synthetic LLM transition markers).
-- [ ] Compute granular sentence-level AI probability ratings returned in the analysis payload.
-- [ ] Build interactive Forensic Stylometrics Panel & Sentence Heatmap in `src/app/components/Results.tsx` (color-coded human/mixed/synthetic highlights, perplexity predictability meter, cadence variance distribution chart).
+- [x] Upgrade backend neural checkpoint in `backend/app/config.py` from raw `roberta-base` to a fine-tuned AI text detection model (`Hello-SimpleAI/chatgpt-detector-roberta` / `roberta-base-openai-detector`).
+- [x] Implement multi-signal stylometrics in `backend/app/services/linguistic.py` (sentence-level burstiness variance, log-likelihood perplexity estimation, type-token lexical richness, and expanded 120+ synthetic LLM transition markers).
+- [x] Compute granular sentence-level AI probability ratings returned in the analysis payload.
+- [x] Build interactive Forensic Stylometrics Panel & Sentence Heatmap in `src/app/components/Results.tsx` (color-coded human/mixed/synthetic highlights, perplexity predictability meter, cadence variance distribution chart).
 
 ---
 

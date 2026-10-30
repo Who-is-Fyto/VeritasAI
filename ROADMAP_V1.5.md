@@ -95,8 +95,8 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Generate clean, formatted PDF/Print layout with unique Verification ID, timestamp, breakdown scores, and highlighted Truth Map summary for researchers and journalists.
 
 ### Phase 13: Full Integration, Mock & Real API Parity
-- [ ] Verify complete operational parity between offline mock mode (`VITE_USE_MOCK_API=true`) and live backend mode (`VITE_USE_MOCK_API=false`).
-- [ ] Ensure Sonner toast notifications, dialog accessibility, and responsive layouts across all mobile and desktop viewports.
+- [x] Verify complete operational parity between offline mock mode (`VITE_USE_MOCK_API=true`) and live backend mode (`VITE_USE_MOCK_API=false`).
+- [x] Ensure Sonner toast notifications, dialog accessibility, and responsive layouts across all mobile and desktop viewports.
 
 ### Phase 14: Verification, Automated Testing, and Examiner Defense Preparation
 - [ ] Write unit/integration tests for form validation, strict email rules, backup endpoints, and admin RBAC.

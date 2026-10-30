@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import {
   FileText, Link as LinkIcon, Upload, Sparkles, ArrowRight,
@@ -129,14 +130,23 @@ export function Verify() {
 
     try {
       if (USE_MOCK_API) {
-        // ── Mock path: simulate 5 pipeline steps locally ──
-        for (let i = 0; i < PIPELINE_STEPS.length; i++) {
+        // ── Mock path: call mock analyse and animate pipeline steps ──
+        setAnalyzeStep(0);
+        const [result] = await Promise.all([
+          veritasAPI.analyse({ content, type: activeTab as "text" | "url" }),
+          addLogsForStep(0),
+        ]);
+
+        for (let i = 1; i < PIPELINE_STEPS.length; i++) {
           setAnalyzeStep(i);
           await addLogsForStep(i);
-          await new Promise((r) => setTimeout(r, 200));
+          await new Promise((r) => setTimeout(r, 160));
         }
-        const id = Math.random().toString(36).substring(7);
-        navigate(`/results/${id}`, { state: { text: content, type: activeTab } });
+
+        toast.success("Multimodal analysis complete! Loading Credibility Index Report.");
+        navigate(`/results/${result.id}`, {
+          state: { text: content, type: activeTab, result },
+        });
       } else {
         // ── Real path: call FastAPI backend ──
         setAnalyzeStep(0);
@@ -151,6 +161,7 @@ export function Verify() {
           await addLogsForStep(i);
         }
 
+        toast.success("Multimodal analysis complete! Loading Credibility Index Report.");
         navigate(`/results/${result.id}`, {
           state: { text: content, type: activeTab, result },
         });
@@ -161,6 +172,7 @@ export function Verify() {
           ? `Backend error (${err.status}): ${err.message}`
           : "Could not reach the analysis server. Is the backend running?";
       setApiError(msg);
+      toast.error(msg);
       setLogMessages((prev) => [...prev, `✗ ${msg}`]);
       setIsAnalyzing(false);
       setAnalyzeStep(-1);

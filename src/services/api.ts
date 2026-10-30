@@ -42,6 +42,46 @@ export class VeritasAPIError extends Error {
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (import.meta.env.VITE_USE_MOCK_API !== "false") {
     // Return mock responses for mock mode so we don't call fetch and fail proxy
+    if (path.startsWith("/api/v1/health")) {
+      return {
+        status: "ok",
+        version: "1.5.0",
+        model_loaded: true,
+        db_connected: true,
+      } as T;
+    }
+    if (path.startsWith("/api/v1/auth/register") || path.startsWith("/api/v1/auth/login")) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      const email = (body.email || "demo@veritas.ai").trim();
+      const isSuperAdmin =
+        email.toLowerCase().includes("superadmin") || email.toLowerCase() === "admin@veritas.ai";
+      const name = isSuperAdmin ? "VeritasAI Super Administrator" : (body.name || email.split("@")[0]);
+      const mockUser = {
+        id: isSuperAdmin ? "admin-1" : "mock-user-123",
+        email,
+        name,
+        joined_at: new Date().toISOString(),
+        role: isSuperAdmin ? "superadmin" : "Research Analyst",
+        institution: isSuperAdmin ? "VeritasAI Governance Directorate" : "Richfield Faculty of ICT",
+        account_type: isSuperAdmin ? "enterprise" : "academic",
+        tier: isSuperAdmin ? "superadmin" : "academic",
+      };
+      localStorage.setItem("veritas_token", "mock-token-abc");
+      localStorage.setItem("veritas_user", JSON.stringify(mockUser));
+      return {
+        access_token: "mock-token-abc",
+        token_type: "bearer",
+        user: mockUser,
+      } as T;
+    }
+    if (path.startsWith("/api/v1/auth/profile")) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      const savedUserStr = localStorage.getItem("veritas_user");
+      const current = savedUserStr ? JSON.parse(savedUserStr) : {};
+      const updated = { ...current, ...body };
+      localStorage.setItem("veritas_user", JSON.stringify(updated));
+      return updated as T;
+    }
     if (path.startsWith("/api/v1/auth/me")) {
       const savedUser = localStorage.getItem("veritas_user");
       return (savedUser ? JSON.parse(savedUser) : { id: "mock-user-123", email: "mock@veritas.ai", name: "Mock User", joined_at: new Date().toISOString() }) as T;
@@ -55,35 +95,75 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       return updated as T;
     }
     if (path.startsWith("/api/v1/auth/keys")) {
+      const getStoredKeys = () => {
+        try {
+          const raw = localStorage.getItem("veritas_mock_keys");
+          return raw ? JSON.parse(raw) : [
+            { id: "mock-key-1", name: "Research Script Key", key_prefix: "veritas_abcd", created_at: new Date().toISOString() }
+          ];
+        } catch {
+          return [];
+        }
+      };
       if (options?.method === "POST") {
         const body = JSON.parse(options.body as string);
-        return {
+        const newKey = {
           id: Math.random().toString(36).substring(7),
           name: body.name,
           key_prefix: "veritas_mock",
           created_at: new Date().toISOString(),
-          api_key: "veritas_mock_key_" + Math.random().toString(36).substring(7)
-        } as T;
+          api_key: "veritas_mock_key_" + Math.random().toString(36).substring(7),
+        };
+        const currentKeys = getStoredKeys();
+        const updated = [...currentKeys, newKey];
+        localStorage.setItem("veritas_mock_keys", JSON.stringify(updated));
+        return newKey as T;
       }
       if (options?.method === "DELETE") {
+        const keyId = path.split("/").pop();
+        const currentKeys = getStoredKeys();
+        const updated = currentKeys.filter((k: any) => k.id !== keyId);
+        localStorage.setItem("veritas_mock_keys", JSON.stringify(updated));
         return { status: "success" } as T;
       }
       // GET list keys
-      return [
-        { id: "mock-key-1", name: "Research Script Key", key_prefix: "veritas_abcd", created_at: new Date().toISOString() }
-      ] as T;
+      return getStoredKeys() as T;
     }
     if (path.startsWith("/api/v1/admin/train/status")) {
-      return {
+      const raw = localStorage.getItem("veritas_mock_train");
+      let trainObj = {
         status: "idle",
         samples_trained: 142,
         epoch: 3,
         loss: 0.042,
         last_run: new Date().toISOString(),
-        weights_file_exists: true
-      } as T;
+        weights_file_exists: true,
+      };
+      if (raw) {
+        try {
+          trainObj = JSON.parse(raw);
+        } catch {
+          // ignore
+        }
+      }
+      return trainObj as T;
     }
     if (path.startsWith("/api/v1/admin/train/trigger")) {
+      const trainObj = {
+        status: "training",
+        samples_trained: 142,
+        epoch: 4,
+        loss: 0.038,
+        last_run: new Date().toISOString(),
+        weights_file_exists: true,
+      };
+      localStorage.setItem("veritas_mock_train", JSON.stringify(trainObj));
+      setTimeout(() => {
+        localStorage.setItem(
+          "veritas_mock_train",
+          JSON.stringify({ ...trainObj, status: "idle", samples_trained: 178 })
+        );
+      }, 3000);
       return { status: "success", message: "Training initiated" } as T;
     }
     if (path.startsWith("/api/v1/admin/telemetry/db")) {
@@ -414,32 +494,139 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         total_size_formatted: `${(totalBytes / 1024).toFixed(1)} KB`,
       } as T;
     }
+    if (path.startsWith("/api/v1/analyse")) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      const content = body.content || "";
+      const inputType = body.type || "text";
+      const docId = `res-${Math.random().toString(36).substring(2, 10)}`;
+
+      const lower = content.toLowerCase();
+      const isSuspect =
+        lower.includes("miracle") ||
+        lower.includes("5g") ||
+        lower.includes("shocking") ||
+        lower.includes("conspiracy") ||
+        lower.includes("secret cure");
+
+      const overall = isSuspect ? 32.0 : 84.0;
+      const lingScore = isSuspect ? 35.0 : 88.0;
+      const srcScore = isSuspect ? 25.0 : 82.0;
+      const corrobScore = isSuspect ? 36.0 : 80.0;
+      const aiProb = isSuspect ? 78.0 : 14.0;
+
+      const mockAnalysisResult: AnalysisResult = {
+        id: docId,
+        status: "complete",
+        input_type: inputType,
+        submitted_at: new Date().toISOString(),
+        overall_score: overall,
+        ai_probability: aiProb,
+        scores: {
+          linguistic_score: lingScore,
+          source_score: srcScore,
+          corroboration_score: corrobScore,
+          weights: { linguistic: 0.4, source: 0.35, corroboration: 0.25 },
+        },
+        xai_annotations: isSuspect
+          ? [
+              { text: "Shocking new discovery", type: "manipulative", reason: "Hyperbolic emotional phrasing", confidence: 92 },
+              { text: "They do not want you to know this", type: "manipulative", reason: "Conspiratorial urgency marker", confidence: 96 },
+            ]
+          : [
+              { text: "According to official reports", type: "verified", reason: "Factual attribution to institutional sources", confidence: 95 },
+              { text: "peer-reviewed research confirms", type: "verified", reason: "Academic corroboration marker", confidence: 91 },
+            ],
+        sources: isSuspect
+          ? [
+              { name: "Unverified Forum", credibility: 24, status: "questionable", matches: 1 },
+              { name: "Social Media Wire", credibility: 30, status: "questionable", matches: 2 },
+            ]
+          : [
+              { name: "Reuters", credibility: 98, status: "verified", matches: 3 },
+              { name: "Associated Press", credibility: 96, status: "verified", matches: 2 },
+              { name: "BBC News", credibility: 94, status: "verified", matches: 1 },
+            ],
+        claims: isSuspect
+          ? [
+              {
+                claim: content.slice(0, 80) || "Unsubstantiated viral claim",
+                status: "false",
+                confidence: 94,
+                sources: 0,
+                explanation: "Debunked by institutional fact-checking bodies and public news wires.",
+              },
+            ]
+          : [
+              {
+                claim: content.slice(0, 80) || "Documented global trend statement",
+                status: "verified",
+                confidence: 92,
+                sources: 3,
+                explanation: "Confirmed across multiple independent international news wires.",
+              },
+            ],
+        linguistic_flags: [
+          { label: "Sentence structure variance", rating: "Normal", ok: !isSuspect },
+          { label: "Vocabulary richness (TTR)", rating: "0.68 — typical human range", ok: true },
+          { label: "AI stylometric markers", rating: isSuspect ? "Elevated presence (78%)" : "Low presence (14%)", ok: !isSuspect },
+        ],
+        summary: isSuspect
+          ? "Content contains severe manipulation markers and unverified assertions."
+          : "Content is highly credible and corroborated by authoritative news wires.",
+        content: content,
+      };
+
+      try {
+        const stored = localStorage.getItem("veritas_mock_analyses") || "{}";
+        const analysesMap = JSON.parse(stored);
+        analysesMap[docId] = mockAnalysisResult;
+        localStorage.setItem("veritas_mock_analyses", JSON.stringify(analysesMap));
+      } catch {
+        // ignore localstorage errors
+      }
+
+      return mockAnalysisResult as T;
+    }
     if (path.startsWith("/api/v1/results/") && path.endsWith("/feedback")) {
-      return { status: "success" } as T;
+      return { status: "success", message: "Feedback recorded successfully." } as T;
     }
     if (path.startsWith("/api/v1/results/") && path.endsWith("/certificate")) {
       const parts = path.split("/");
       const id = parts[parts.length - 2] || "mock-id";
+      let resData: any = null;
+      try {
+        const stored = localStorage.getItem("veritas_mock_analyses") || "{}";
+        const analysesMap = JSON.parse(stored);
+        resData = analysesMap[id];
+      } catch {
+        // ignore
+      }
+
+      const overall = resData ? resData.overall_score : 84.0;
+      const verdict =
+        overall >= 80 ? "Verified Credible" : overall >= 60 ? "Mostly Factual" : overall >= 40 ? "Caution Required" : "Flagged Disinformation";
+
       return {
         certificate_id: `CERT-B94A${id.slice(-6).toUpperCase()}`,
         verification_id: `VER-${id.slice(-8).toUpperCase()}`,
         issued_at: new Date().toISOString(),
         content_hash: "a4f89d309be04f478a2cb45582f3ef7e9b2311893116e0",
-        target_summary: "Multi-dimensional credibility assessment and algorithmic disinformation forensic evaluation.",
-        input_type: "text",
-        overall_score: 84.0,
-        verdict_label: "Verified Credible",
+        target_summary:
+          resData?.summary || "Multi-dimensional credibility assessment and algorithmic disinformation forensic evaluation.",
+        input_type: resData?.input_type || "text",
+        overall_score: overall,
+        verdict_label: verdict,
         confidence_interval: 2.5,
-        scores: {
+        scores: resData?.scores || {
           linguistic_score: 88.0,
           source_score: 82.0,
           corroboration_score: 80.0,
           weights: { linguistic: 0.4, source: 0.35, corroboration: 0.25 },
         },
-        ai_probability: 12.0,
-        claims_verified: 3,
-        claims_total: 4,
-        top_sources: ["Reuters", "Associated Press", "BBC News"],
+        ai_probability: resData?.ai_probability || 14.0,
+        claims_verified: resData ? resData.claims.filter((c: any) => c.status === "verified").length : 3,
+        claims_total: resData ? resData.claims.length : 4,
+        top_sources: resData ? resData.sources.map((s: any) => s.name) : ["Reuters", "Associated Press", "BBC News"],
         digital_signature: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         issuer: "VeritasAI Credibility & Forensic Attestation Authority",
         standard: "ISO/IEC 23894 AI Risk Management & IEEE 7001 Algorithmic Transparency",
@@ -447,34 +634,48 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       } as T;
     }
     if (path.startsWith("/api/v1/results/")) {
-      // Mock result retrieval
+      const id = path.split("/").pop() ?? "mock-id";
+      try {
+        const stored = localStorage.getItem("veritas_mock_analyses") || "{}";
+        const analysesMap = JSON.parse(stored);
+        if (analysesMap[id]) {
+          return analysesMap[id] as T;
+        }
+      } catch {
+        // ignore
+      }
+
+      // Mock result fallback
       return {
-        id: path.split("/").pop() ?? "mock-id",
+        id,
         status: "complete",
+        input_type: "text",
         overall_score: 84.0,
-        ai_probability: 12.0,
+        ai_probability: 14.0,
         scores: {
           linguistic_score: 88.0,
           source_score: 82.0,
           corroboration_score: 80.0,
-          weights: { linguistic: 0.4, source: 0.35, corroboration: 0.25 }
+          weights: { linguistic: 0.4, source: 0.35, corroboration: 0.25 },
         },
         xai_annotations: [
           { text: "Reuters reported that", type: "verified", reason: "Factual statement matching verified source", confidence: 94 },
-          { text: "sensational clickbait headline", type: "manipulative", reason: "Hyperbolic emotional phrasing", confidence: 85 }
+          { text: "sensational clickbait headline", type: "manipulative", reason: "Hyperbolic emotional phrasing", confidence: 85 },
         ],
         sources: [
           { name: "Reuters", credibility: 98, matches: 3, status: "verified" },
-          { name: "Associated Press", credibility: 96, matches: 2, status: "verified" }
+          { name: "Associated Press", credibility: 96, matches: 2, status: "verified" },
         ],
         claims: [
-          { claim: "Global temperatures rose by 1.2 degrees in 2024", status: "verified", confidence: 91, sources: 3 }
+          { claim: "Global temperatures rose by 1.2 degrees in 2024", status: "verified", confidence: 91, sources: 3 },
         ],
         linguistic_flags: [
           { label: "Sentence structure variance", rating: "Normal", ok: true },
-          { label: "AI stylometric markers", rating: "Low presence", ok: true }
+          { label: "AI stylometric markers", rating: "Low presence (14%)", ok: true },
         ],
-        submitted_at: new Date().toISOString()
+        summary: "Content is highly credible and corroborated by authoritative news wires.",
+        content: "According to Reuters, renewable energy investment grew by 15% globally in 2024.",
+        submitted_at: new Date().toISOString(),
       } as T;
     }
     return {} as T;

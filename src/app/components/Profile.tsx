@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import {
   User, Shield, History, Settings, ExternalLink, BarChart2,
@@ -69,9 +70,12 @@ export function Profile() {
         student_id: editStudentId.trim() || undefined,
       });
       setIsEditingProfile(false);
+      toast.success("Profile updated successfully.");
     } catch (err: any) {
       console.error(err);
-      setEditError(err.message || "Failed to save profile changes.");
+      const msg = err.message || "Failed to save profile changes.";
+      setEditError(msg);
+      toast.error(msg);
     } finally {
       setEditSaving(false);
     }
@@ -82,6 +86,7 @@ export function Profile() {
     setEditInstitution(rawAff.institution);
     setEditRole(rawAff.role);
     setEditStudentId(rawAff.studentId || "");
+    toast.info("Profile fields reset to domain-inferred defaults.");
   };
 
   const [trainStatus, setTrainStatus] = useState<any>({
@@ -106,6 +111,7 @@ export function Profile() {
             setTrainStatus(res);
             if (res.status !== "training") {
               clearInterval(interval);
+              toast.success("Active learning cycle completed successfully.");
             }
           })
           .catch(console.error);
@@ -120,8 +126,10 @@ export function Profile() {
     try {
       await veritasAPI.triggerTraining();
       setTrainStatus((prev: any) => ({ ...prev, status: "training" }));
-    } catch (err) {
+      toast.success("Active learning cycle initiated.");
+    } catch (err: any) {
       console.error("Failed to trigger training:", err);
+      toast.error(err.message || "Failed to trigger active learning.");
     }
   };
 
@@ -141,8 +149,10 @@ export function Profile() {
       setGeneratedKey(data.api_key);
       setKeys((prev) => [...prev, data]);
       setNewKeyName("");
-    } catch (err) {
+      toast.success("Developer API key generated successfully.");
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || "Failed to generate API key.");
     }
   };
 
@@ -150,8 +160,10 @@ export function Profile() {
     try {
       await veritasAPI.deleteKey(keyId);
       setKeys((prev) => prev.filter((k) => k.id !== keyId));
-    } catch (err) {
+      toast.success("API key revoked.");
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || "Failed to revoke API key.");
     }
   };
 

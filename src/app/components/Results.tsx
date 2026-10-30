@@ -296,11 +296,12 @@ export function Results() {
 
 
   useEffect(() => {
-    if (!loadedResult && id && import.meta.env.VITE_USE_MOCK_API !== "true") {
+    if (!loadedResult && id) {
       setLoading(true);
       veritasAPI.getResult(id)
         .then((res) => {
           setLoadedResult(res);
+          if (res.content && !text) setText(res.content);
           if (res.input_type) setType(res.input_type);
           setLoading(false);
         })
@@ -309,7 +310,7 @@ export function Results() {
           setLoading(false);
         });
     }
-  }, [id, loadedResult]);
+  }, [id, loadedResult, text]);
 
 
   const handleFeedback = async (isAccurate: boolean, correctedLabel: string) => {

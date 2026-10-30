@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { BrandLogo } from "./ui/BrandLogo";
 import { Link, useNavigate, useLocation } from "react-router";
+import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { Key, Mail, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
@@ -53,10 +54,13 @@ export function Login() {
 
     try {
       await login({ email: email.trim(), password });
+      toast.success("Welcome back! Authentication successful.");
       navigate(redirectUrl);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to log in. Please check your credentials.");
+      const msg = err.message || "Failed to log in. Please check your credentials.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

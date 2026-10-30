@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { resolveAffiliation } from "../../utils/affiliation";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -80,10 +81,13 @@ export function Signup() {
         email: email.trim(),
         password,
       });
+      toast.success("Account created successfully! Welcome to VeritasAI.");
       navigate("/verify");
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Registration failed. Email might already be taken.");
+      const msg = err.message || "Registration failed. Email might already be taken.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

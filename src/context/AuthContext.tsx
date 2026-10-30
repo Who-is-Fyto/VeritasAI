@@ -77,19 +77,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (credentials: any) => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const email = (credentials.email || "").trim().toLowerCase();
+      const isSuperAdmin = email.includes("superadmin") || email === "admin@veritas.ai";
       const aff = resolveAffiliation(credentials.email);
-      const tier: AccountTier =
-        aff.accountType === "academic" ? "academic" : aff.accountType === "enterprise" ? "pro" : "free";
+      const tier: AccountTier = isSuperAdmin
+        ? "superadmin"
+        : aff.accountType === "academic"
+        ? "academic"
+        : aff.accountType === "enterprise"
+        ? "pro"
+        : "free";
 
       const mockUser: User = {
-        id: "mock-user-123",
+        id: isSuperAdmin ? "admin-1" : "mock-user-123",
         email: credentials.email,
-        name: credentials.email.split("@")[0],
+        name: isSuperAdmin ? "VeritasAI Super Administrator" : (credentials.name || credentials.email.split("@")[0]),
         joined_at: new Date().toISOString(),
-        institution: aff.institution,
-        role: aff.role,
+        institution: isSuperAdmin ? "VeritasAI Governance Directorate" : aff.institution,
+        role: isSuperAdmin ? "superadmin" : aff.role,
         student_id: aff.studentId || undefined,
-        account_type: aff.accountType,
+        account_type: isSuperAdmin ? "enterprise" : aff.accountType,
         tier,
       };
       setToken("mock-token-abc");
@@ -114,19 +121,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (payload: any) => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const email = (payload.email || "").trim().toLowerCase();
+      const isSuperAdmin = email.includes("superadmin") || email === "admin@veritas.ai";
       const aff = resolveAffiliation(payload.email);
-      const tier: AccountTier =
-        aff.accountType === "academic" ? "academic" : aff.accountType === "enterprise" ? "pro" : "free";
+      const tier: AccountTier = isSuperAdmin
+        ? "superadmin"
+        : aff.accountType === "academic"
+        ? "academic"
+        : aff.accountType === "enterprise"
+        ? "pro"
+        : "free";
 
       const mockUser: User = {
-        id: "mock-user-123",
+        id: isSuperAdmin ? "admin-1" : "mock-user-123",
         email: payload.email,
-        name: payload.name,
+        name: isSuperAdmin ? "VeritasAI Super Administrator" : payload.name,
         joined_at: new Date().toISOString(),
-        institution: payload.institution || aff.institution,
-        role: payload.role || aff.role,
+        institution: isSuperAdmin ? "VeritasAI Governance Directorate" : (payload.institution || aff.institution),
+        role: isSuperAdmin ? "superadmin" : (payload.role || aff.role),
         student_id: payload.student_id || aff.studentId || undefined,
-        account_type: aff.accountType,
+        account_type: isSuperAdmin ? "enterprise" : aff.accountType,
         tier,
       };
       setToken("mock-token-abc");

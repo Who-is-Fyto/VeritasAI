@@ -102,6 +102,12 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [ ] Write unit/integration tests for form validation, strict email rules, backup endpoints, and admin RBAC.
 - [ ] Compile an Examiner Defense Quick Reference Guide highlighting key architectural decisions, validation workflows, and database recovery procedures.
 
+### Phase 15: Deep AI Text Detection & Forensic Stylometrics Engine
+- [ ] Upgrade backend neural checkpoint in `backend/app/config.py` from raw `roberta-base` to a fine-tuned AI text detection model (`Hello-SimpleAI/chatgpt-detector-roberta` / `roberta-base-openai-detector`).
+- [ ] Implement multi-signal stylometrics in `backend/app/services/linguistic.py` (sentence-level burstiness variance, log-likelihood perplexity estimation, type-token lexical richness, and expanded 120+ synthetic LLM transition markers).
+- [ ] Compute granular sentence-level AI probability ratings returned in the analysis payload.
+- [ ] Build interactive Forensic Stylometrics Panel & Sentence Heatmap in `src/app/components/Results.tsx` (color-coded human/mixed/synthetic highlights, perplexity predictability meter, cadence variance distribution chart).
+
 ---
 
 ## Examiner Defense Quick Reference
@@ -111,5 +117,6 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 | **Form Validation** | Client-side schema validation + inline error rendering; disabled submit states until valid | `src/app/components/Login.tsx`, `Signup.tsx`, `Verify.tsx` |
 | **Email Integrity** | RFC-compliant regex + rejection of short/bogus domains (`yd@g.com`, disposable patterns) | `src/utils/validation.ts`, `backend/app/schemas/auth.py` |
 | **Account Tiers** | Free, Pro, Academic tier definitions; feature-gated deep scans; upgrade modal | `src/context/AuthContext.tsx`, `backend/app/schemas/auth.py` |
-| **Super Admin** | Role-gated management portal for users, system metrics, and audit logs | `src/app/components/Admin.tsx`, `backend/app/routers/admin.py` |
-| **In-UI Backup & Restore** | Direct browser-initiated backup creation, archive download, and one-click database restore | `src/app/components/admin/BackupCenter.tsx`, `backend/app/routers/admin.py` |
+| **Super Admin** | Role-gated management portal for users, system metrics, and audit logs | `src/app/components/AdminDashboard.tsx`, `backend/app/routers/admin.py` |
+| **In-UI Backup & Restore** | Direct browser-initiated backup creation, archive download, and one-click database restore | `src/app/components/AdminDashboard.tsx`, `backend/app/routers/admin.py` |
+| **AI Text Detection** | Dual-signal hybrid engine (fine-tuned transformer checkpoint + burstiness/perplexity stylometrics + sentence heatmap) | `src/app/components/Results.tsx`, `backend/app/services/linguistic.py` |

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.db.mongodb import get_db
@@ -28,8 +29,13 @@ from app.schemas.admin import (
     VerificationTelemetrySummary,
     AuditLogEntry,
     AuditLogsResponse,
+    BackupMetadata,
+    BackupListResponse,
+    RestoreRequest,
+    RestoreResponse,
 )
 from app.services.trainer import trainer_service
+from app.services.backup import backup_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -536,3 +542,139 @@ async def trigger_training(
         ip_address=client_ip
     )
     return {"status": "accepted", "message": "Self-training job dispatched in background."}
+
+
+# ── IN-UI DATABASE BACKUP & RESTORE APIS ─────────────────────────────────────
+
+@router.post(
+    "/backups",
+    response_model=BackupMetadata,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate a compressed BSON/JSON backup archive of the database"
+)
+async def create_backup(
+    req: Request,
+    current_admin: UserResponse = Depends(require_superadmin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> BackupMetadata:
+    meta = await backup_service.create_backup(db)
+    client_ip = req.client.host if req.client else None
+    await log_audit_event(
+        db,
+        actor_id=current_admin.id,
+        actor_email=current_admin.email,
+        action="DATABASE_BACKUP_CREATED",
+        target_id=meta.backup_id,
+        target_type="backup",
+        details={
+            "filename": meta.filename,
+            "size_bytes": meta.size_bytes,
+            "total_documents": meta.total_documents,
+            "collections": meta.collections,
+        },
+        ip_address=client_ip
+    )
+    return meta
+
+
+@router.get(
+    "/backups",
+    response_model=BackupListResponse,
+    summary="List historical backup snapshots and storage footprint"
+)
+async def list_backups(
+    current_admin: UserResponse = Depends(require_superadmin),
+) -> BackupListResponse:
+    return await backup_service.list_backups()
+
+
+@router.get(
+    "/backups/{filename}/download",
+    summary="Download a compressed backup zip archive"
+)
+async def download_backup(
+    filename: str,
+    req: Request,
+    current_admin: UserResponse = Depends(require_superadmin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    file_path = backup_service.get_backup_path(filename)
+    client_ip = req.client.host if req.client else None
+    await log_audit_event(
+        db,
+        actor_id=current_admin.id,
+        actor_email=current_admin.email,
+        action="DATABASE_BACKUP_DOWNLOADED",
+        target_id=filename,
+        target_type="backup",
+        details={"filename": filename},
+        ip_address=client_ip
+    )
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post(
+    "/backups/{filename}/restore",
+    response_model=RestoreResponse,
+    summary="Restore MongoDB database collections from a historical backup snapshot"
+)
+async def restore_backup(
+    filename: str,
+    body: RestoreRequest,
+    req: Request,
+    current_admin: UserResponse = Depends(require_superadmin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> RestoreResponse:
+    res = await backup_service.restore_backup(
+        db=db,
+        filename=filename,
+        confirmation_text=body.confirmation_text,
+        drop_existing=body.drop_existing
+    )
+    client_ip = req.client.host if req.client else None
+    await log_audit_event(
+        db,
+        actor_id=current_admin.id,
+        actor_email=current_admin.email,
+        action="DATABASE_BACKUP_RESTORED",
+        target_id=filename,
+        target_type="backup",
+        details={
+            "filename": filename,
+            "restored_documents": res.total_documents_restored,
+            "collections": res.collections_restored,
+        },
+        ip_address=client_ip
+    )
+    return res
+
+
+@router.delete(
+    "/backups/{filename}",
+    summary="Delete a backup archive permanently from server disk"
+)
+async def delete_backup(
+    filename: str,
+    req: Request,
+    current_admin: UserResponse = Depends(require_superadmin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    backup_service.delete_backup(filename)
+    client_ip = req.client.host if req.client else None
+    await log_audit_event(
+        db,
+        actor_id=current_admin.id,
+        actor_email=current_admin.email,
+        action="DATABASE_BACKUP_DELETED",
+        target_id=filename,
+        target_type="backup",
+        details={"filename": filename},
+        ip_address=client_ip
+    )
+    return {"status": "success", "message": f"Backup archive '{filename}' deleted successfully."}
+

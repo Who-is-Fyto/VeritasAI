@@ -14,7 +14,15 @@
  */
 
 import type { AnalysisResult, AnalyseRequest } from "../types/analysis";
-import type { AdminUser, AdminUserListResponse, DatabaseTelemetry, AuditLogsResponse } from "../types/admin";
+import type {
+  AdminUser,
+  AdminUserListResponse,
+  DatabaseTelemetry,
+  AuditLogsResponse,
+  BackupMetadata,
+  BackupListResponse,
+  RestoreResponse,
+} from "../types/admin";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -308,6 +316,104 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         pages: 1,
       } as T;
     }
+    if (path.startsWith("/api/v1/admin/backups")) {
+      const getStoredBackups = (): BackupMetadata[] => {
+        const stored = localStorage.getItem("veritas_mock_backups");
+        if (stored) {
+          try {
+            return JSON.parse(stored);
+          } catch {
+            // fallback
+          }
+        }
+        const initial: BackupMetadata[] = [
+          {
+            backup_id: "bkp-seed-01",
+            filename: "veritas_backup_20261029_180000.zip",
+            created_at: new Date(Date.now() - 1000 * 60 * 60 * 15).toISOString(),
+            size_bytes: 348160,
+            size_formatted: "340.0 KB",
+            collections: { users: 18, results: 164, api_keys: 12, feedback: 42, audit_logs: 89 },
+            total_documents: 325,
+            checksum_sha256: "7a8f9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a",
+            status: "completed",
+          },
+          {
+            backup_id: "bkp-seed-02",
+            filename: "veritas_backup_20261028_093000.zip",
+            created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+            size_bytes: 286720,
+            size_formatted: "280.0 KB",
+            collections: { users: 14, results: 120, api_keys: 8, feedback: 30, audit_logs: 45 },
+            total_documents: 217,
+            checksum_sha256: "3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e",
+            status: "completed",
+          },
+        ];
+        localStorage.setItem("veritas_mock_backups", JSON.stringify(initial));
+        return initial;
+      };
+
+      // 1. POST /api/v1/admin/backups (create)
+      if (options?.method === "POST" && !path.includes("/restore")) {
+        const currentList = getStoredBackups();
+        const now = new Date();
+        const dateStr = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
+        const newBackup: BackupMetadata = {
+          backup_id: `bkp-${Math.random().toString(36).substring(2, 9)}`,
+          filename: `veritas_backup_${dateStr}.zip`,
+          created_at: now.toISOString(),
+          size_bytes: 368640,
+          size_formatted: "360.0 KB",
+          collections: { users: 18, results: 164, api_keys: 12, feedback: 42, audit_logs: 94 },
+          total_documents: 330,
+          checksum_sha256: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
+          status: "completed",
+        };
+        const updated = [newBackup, ...currentList];
+        localStorage.setItem("veritas_mock_backups", JSON.stringify(updated));
+        return newBackup as T;
+      }
+
+      // 2. POST /api/v1/admin/backups/{filename}/restore
+      if (options?.method === "POST" && path.includes("/restore")) {
+        const parts = path.split("/");
+        const filename = parts[parts.indexOf("backups") + 1];
+        const body = options.body ? JSON.parse(options.body as string) : {};
+        if (body.confirmation_text?.trim().toUpperCase() !== "RESTORE") {
+          throw new VeritasAPIError(400, "Safety confirmation required. You must submit 'RESTORE' to proceed.");
+        }
+        return {
+          status: "success",
+          backup_filename: filename,
+          restored_at: new Date().toISOString(),
+          collections_restored: { users: 18, results: 164, api_keys: 12, feedback: 42, audit_logs: 94 },
+          total_documents_restored: 330,
+          message: `Database restored successfully from snapshot '${filename}'.`,
+          details: { original_created_at: new Date().toISOString() },
+        } as T;
+      }
+
+      // 3. DELETE /api/v1/admin/backups/{filename}
+      if (options?.method === "DELETE") {
+        const parts = path.split("/");
+        const filename = parts[parts.indexOf("backups") + 1];
+        const currentList = getStoredBackups();
+        const updated = currentList.filter((b) => b.filename !== filename);
+        localStorage.setItem("veritas_mock_backups", JSON.stringify(updated));
+        return { status: "success", message: `Backup archive '${filename}' deleted successfully.` } as T;
+      }
+
+      // 4. GET /api/v1/admin/backups
+      const list = getStoredBackups();
+      const totalBytes = list.reduce((acc, b) => acc + b.size_bytes, 0);
+      return {
+        backups: list,
+        total: list.length,
+        total_size_bytes: totalBytes,
+        total_size_formatted: `${(totalBytes / 1024).toFixed(1)} KB`,
+      } as T;
+    }
     if (path.startsWith("/api/v1/results/") && path.endsWith("/feedback")) {
       return { status: "success" } as T;
     }
@@ -559,6 +665,78 @@ export const veritasAPI = {
     const qs = q.toString();
     return request(`/api/v1/admin/audit-logs${qs ? `?${qs}` : ""}`);
   },
+
+  /**
+   * POST /api/v1/admin/backups
+   * Create an immediate compressed BSON/JSON database backup.
+   */
+  adminCreateBackup: (): Promise<BackupMetadata> =>
+    request("/api/v1/admin/backups", {
+      method: "POST",
+    }),
+
+  /**
+   * GET /api/v1/admin/backups
+   * Retrieve historical backup archives ledger.
+   */
+  adminListBackups: (): Promise<BackupListResponse> =>
+    request("/api/v1/admin/backups"),
+
+  /**
+   * GET /api/v1/admin/backups/:filename/download
+   * Trigger browser file download of the backup archive zip.
+   */
+  adminDownloadBackup: async (filename: string): Promise<void> => {
+    if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const blob = new Blob(["PK\x05\x06" + "\x00".repeat(18)], { type: "application/zip" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return;
+    }
+    const token = localStorage.getItem("veritas_token");
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE}/api/v1/admin/backups/${encodeURIComponent(filename)}/download`, {
+      headers,
+    });
+    if (!response.ok) {
+      throw new VeritasAPIError(response.status, "Failed to download backup archive.");
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  /**
+   * POST /api/v1/admin/backups/:filename/restore
+   * Restore database from snapshot with safety confirmation.
+   */
+  adminRestoreBackup: (filename: string, confirmationText: string, dropExisting: boolean = true): Promise<RestoreResponse> =>
+    request(`/api/v1/admin/backups/${encodeURIComponent(filename)}/restore`, {
+      method: "POST",
+      body: JSON.stringify({ confirmation_text: confirmationText, drop_existing: dropExisting }),
+    }),
+
+  /**
+   * DELETE /api/v1/admin/backups/:filename
+   * Permanently delete a backup snapshot from server storage.
+   */
+  adminDeleteBackup: (filename: string): Promise<{ status: string; message: string }> =>
+    request(`/api/v1/admin/backups/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+    }),
 };
 
 

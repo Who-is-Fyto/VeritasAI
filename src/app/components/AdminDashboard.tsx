@@ -32,19 +32,24 @@ import {
   ChevronLeft,
   ChevronRight,
   Brain,
-  Sparkles
+  Sparkles,
+  Download,
+  RotateCcw,
+  FileArchive,
+  FolderDown,
+  FileCheck2,
 } from "lucide-react";
 
 import { veritasAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-import type { AdminUser, DatabaseTelemetry, AuditLog } from "../../types/admin";
+import type { AdminUser, DatabaseTelemetry, AuditLog, BackupMetadata } from "../../types/admin";
 
 export function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"users" | "telemetry" | "audit" | "trainer">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "telemetry" | "backups" | "audit" | "trainer">("users");
 
   // Telemetry state
   const [telemetry, setTelemetry] = useState<DatabaseTelemetry | null>(null);
@@ -69,6 +74,24 @@ export function AdminDashboard() {
   const [trainStatus, setTrainStatus] = useState<any>(null);
   const [trainLoading, setTrainLoading] = useState(false);
   const [trainTriggering, setTrainTriggering] = useState(false);
+
+  // Database Backups state
+  const [backups, setBackups] = useState<BackupMetadata[]>([]);
+  const [backupsTotal, setBackupsTotal] = useState(0);
+  const [backupsTotalSize, setBackupsTotalSize] = useState("0 B");
+  const [backupsLoading, setBackupsLoading] = useState(true);
+  const [backupCreating, setBackupCreating] = useState(false);
+  const [downloadingFilename, setDownloadingFilename] = useState<string | null>(null);
+
+  // Restore Modal state
+  const [restoreModalBackup, setRestoreModalBackup] = useState<BackupMetadata | null>(null);
+  const [restoreConfirmation, setRestoreConfirmation] = useState("");
+  const [restoreDropExisting, setRestoreDropExisting] = useState(true);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+
+  // Delete Backup Modal state
+  const [deleteModalBackup, setDeleteModalBackup] = useState<BackupMetadata | null>(null);
+  const [deleteBackupLoading, setDeleteBackupLoading] = useState(false);
 
   // Modals state
   const [suspensionModalUser, setSuspensionModalUser] = useState<AdminUser | null>(null);
@@ -138,12 +161,28 @@ export function AdminDashboard() {
     }
   }, []);
 
+  // ── Fetch Backups ──────────────────────────────────────────────────────────
+  const fetchBackups = useCallback(async () => {
+    try {
+      setBackupsLoading(true);
+      const res = await veritasAPI.adminListBackups();
+      setBackups(res.backups);
+      setBackupsTotal(res.total);
+      setBackupsTotalSize(res.total_size_formatted);
+    } catch (err: any) {
+      toast.error("Backups failed: " + (err.message || "Could not retrieve backup snapshots"));
+    } finally {
+      setBackupsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTelemetry();
     fetchUsers();
     fetchAuditLogs();
     fetchTrainStatus();
-  }, [fetchTelemetry, fetchUsers, fetchAuditLogs, fetchTrainStatus]);
+    fetchBackups();
+  }, [fetchTelemetry, fetchUsers, fetchAuditLogs, fetchTrainStatus, fetchBackups]);
 
   // ── Action Handlers ────────────────────────────────────────────────────────
   const handleUpdateTier = async (userId: string, newTier: string) => {
@@ -225,6 +264,77 @@ export function AdminDashboard() {
     }
   };
 
+  const handleCreateBackup = async () => {
+    try {
+      setBackupCreating(true);
+      const meta = await veritasAPI.adminCreateBackup();
+      toast.success(`System backup created: ${meta.filename} (${meta.size_formatted}, ${meta.total_documents} docs)`);
+      fetchBackups();
+      fetchTelemetry();
+      fetchAuditLogs();
+    } catch (err: any) {
+      toast.error("Backup creation failed: " + (err.message || "Failed to create snapshot"));
+    } finally {
+      setBackupCreating(false);
+    }
+  };
+
+  const handleDownloadBackup = async (filename: string) => {
+    try {
+      setDownloadingFilename(filename);
+      await veritasAPI.adminDownloadBackup(filename);
+      toast.success(`Downloaded backup archive: ${filename}`);
+      fetchAuditLogs();
+    } catch (err: any) {
+      toast.error("Download failed: " + (err.message || "Could not download archive"));
+    } finally {
+      setDownloadingFilename(null);
+    }
+  };
+
+  const handleRestoreBackup = async () => {
+    if (!restoreModalBackup) return;
+    if (restoreConfirmation.trim().toUpperCase() !== "RESTORE") {
+      toast.error("Safety confirmation failed: You must type 'RESTORE' to proceed.");
+      return;
+    }
+    try {
+      setRestoreLoading(true);
+      const res = await veritasAPI.adminRestoreBackup(
+        restoreModalBackup.filename,
+        restoreConfirmation,
+        restoreDropExisting
+      );
+      toast.success(`Database restored successfully from snapshot '${restoreModalBackup.filename}' (${res.total_documents_restored} documents).`);
+      setRestoreModalBackup(null);
+      setRestoreConfirmation("");
+      fetchTelemetry();
+      fetchUsers();
+      fetchBackups();
+      fetchAuditLogs();
+    } catch (err: any) {
+      toast.error("Restore failed: " + (err.message || "Could not restore database snapshot"));
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  const handleDeleteBackup = async () => {
+    if (!deleteModalBackup) return;
+    try {
+      setDeleteBackupLoading(true);
+      await veritasAPI.adminDeleteBackup(deleteModalBackup.filename);
+      toast.success(`Backup archive '${deleteModalBackup.filename}' deleted successfully.`);
+      setDeleteModalBackup(null);
+      fetchBackups();
+      fetchAuditLogs();
+    } catch (err: any) {
+      toast.error("Delete failed: " + (err.message || "Could not delete backup snapshot"));
+    } finally {
+      setDeleteBackupLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50/60 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -257,6 +367,7 @@ export function AdminDashboard() {
                   fetchUsers();
                   fetchAuditLogs();
                   fetchTrainStatus();
+                  fetchBackups();
                   toast.info("Refreshed governance telemetry metrics.");
                 }}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -374,6 +485,23 @@ export function AdminDashboard() {
           >
             <Database className="w-4 h-4" />
             <span>Database Telemetry</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("backups")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "backups"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <FileArchive className="w-4 h-4 text-amber-500" />
+            <span>Backup & Restore Center</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "backups" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+            }`}>
+              {backupsTotal}
+            </span>
           </button>
 
           <button
@@ -716,6 +844,187 @@ export function AdminDashboard() {
           </div>
         )}
 
+        {/* TAB: Backup & Restore Center */}
+        {activeTab === "backups" && (
+          <div className="space-y-6">
+            {/* Top Control Header Card */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs clip-corner-lg space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <FileArchive className="w-5 h-5 text-amber-500" />
+                    <h3 className="font-bold text-slate-900 text-base">In-UI Database Backup & Restore Center</h3>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Generate compressed BSON/JSON snapshots of all MongoDB collections, download offsite archives, and perform double-confirmed disaster recovery.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 font-medium">
+                    <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Total Archives: <strong className="text-slate-900">{backupsTotal}</strong></span>
+                    <span className="text-slate-300">|</span>
+                    <span>Footprint: <strong className="text-slate-900">{backupsTotalSize}</strong></span>
+                  </div>
+
+                  <button
+                    onClick={handleCreateBackup}
+                    disabled={backupCreating}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${backupCreating ? "animate-spin" : ""}`} />
+                    <span>{backupCreating ? "Creating Snapshot..." : "Create System Backup"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Administrative Safeguard Banner */}
+              <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex items-start gap-3">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5 text-xs">
+                  <p className="font-bold text-amber-950">Disaster Recovery Safeguard</p>
+                  <p className="text-amber-800 leading-relaxed">
+                    Database restoration overwrites collections with archive records. The primary superadmin account is automatically re-seeded and preserved post-restore to prevent administrator lockout.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Backups Ledger Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs clip-corner-lg overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FolderDown className="w-4 h-4 text-slate-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Historical Snapshot Archives</span>
+                </div>
+                <button
+                  onClick={fetchBackups}
+                  disabled={backupsLoading}
+                  className="px-2.5 py-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${backupsLoading ? "animate-spin" : ""}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {backupsLoading ? (
+                <div className="p-12 text-center text-xs text-slate-500 space-y-2">
+                  <RefreshCw className="w-6 h-6 animate-spin text-slate-400 mx-auto" />
+                  <p>Loading database backup records...</p>
+                </div>
+              ) : backups.length === 0 ? (
+                <div className="p-12 text-center text-xs text-slate-500 space-y-3">
+                  <FileArchive className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="font-semibold text-slate-700 text-sm">No backup snapshots found</p>
+                  <p className="max-w-md mx-auto text-slate-500">
+                    No compressed database archives currently exist. Click &ldquo;Create System Backup&rdquo; above to generate your first point-in-time snapshot.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/75 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <th className="py-3 px-4">Snapshot Archive</th>
+                        <th className="py-3 px-4">Created Timestamp</th>
+                        <th className="py-3 px-4">Archive Size</th>
+                        <th className="py-3 px-4">Collections Breakdown</th>
+                        <th className="py-3 px-4">Total Records</th>
+                        <th className="py-3 px-4">Integrity</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {backups.map((b) => (
+                        <tr key={b.backup_id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2">
+                              <FileArchive className="w-4 h-4 text-amber-500 shrink-0" />
+                              <div className="space-y-0.5">
+                                <span className="font-mono font-bold text-slate-900 block truncate max-w-[220px]">
+                                  {b.filename}
+                                </span>
+                                {b.checksum_sha256 && (
+                                  <span className="font-mono text-[9px] text-slate-400 block truncate max-w-[220px]" title={b.checksum_sha256}>
+                                    SHA: {b.checksum_sha256.slice(0, 16)}...
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{new Date(b.created_at).toLocaleString()}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2 py-0.5 bg-slate-100 rounded-md font-mono text-[11px] font-semibold text-slate-700">
+                              {b.size_formatted}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-wrap gap-1 max-w-[260px]">
+                              {Object.entries(b.collections).map(([collName, count]) => (
+                                <span
+                                  key={collName}
+                                  className="px-1.5 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 rounded text-[10px] font-mono"
+                                  title={`${collName}: ${count} records`}
+                                >
+                                  {collName}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-slate-900">
+                            {b.total_documents.toLocaleString()} docs
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <FileCheck2 className="w-3 h-3 text-emerald-600" />
+                              <span>Verified BSON</span>
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleDownloadBackup(b.filename)}
+                                disabled={downloadingFilename === b.filename}
+                                title="Download compressed zip archive"
+                                className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Download className={`w-4 h-4 ${downloadingFilename === b.filename ? "animate-bounce" : ""}`} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRestoreModalBackup(b);
+                                  setRestoreConfirmation("");
+                                }}
+                                title="Restore database from this snapshot"
+                                className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteModalBackup(b)}
+                                title="Delete snapshot archive"
+                                className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* TAB 3: Security Audit Ledger */}
         {activeTab === "audit" && (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs clip-corner-lg space-y-4">
@@ -938,6 +1247,133 @@ export function AdminDashboard() {
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {actionLoading ? "Deleting..." : "Permanently Delete"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Database Snapshot Restore Double-Confirmation Modal */}
+      <AnimatePresence>
+        {restoreModalBackup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-xl border border-slate-200 space-y-4"
+            >
+              <div className="flex items-center gap-2.5 text-amber-600">
+                <RotateCcw className="w-5 h-5" />
+                <h3 className="font-bold text-slate-900 text-base">Database Disaster Recovery Center</h3>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                You are about to restore system state from snapshot <strong className="font-mono text-slate-900">{restoreModalBackup.filename}</strong> ({restoreModalBackup.size_formatted}, {restoreModalBackup.total_documents.toLocaleString()} records).
+              </p>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-amber-800">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>Destructive Operation Warning</span>
+                </p>
+                <p className="text-amber-700 leading-relaxed">
+                  Executing this operation will load records from the snapshot. Any verifications or accounts created after this snapshot timestamp ({new Date(restoreModalBackup.created_at).toLocaleString()}) will be replaced.
+                </p>
+              </div>
+
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2 text-xs text-emerald-800">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <p>
+                  <strong>Admin Safeguard:</strong> Your active superadmin account is automatically protected and preserved post-restore to prevent lockout.
+                </p>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={restoreDropExisting}
+                    onChange={(e) => setRestoreDropExisting(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>Drop and replace existing collection documents before importing archive records (recommended to eliminate duplicate key conflicts)</span>
+                </label>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  Type <span className="font-mono text-amber-700">RESTORE</span> to authorize restoration:
+                </label>
+                <input
+                  type="text"
+                  placeholder="RESTORE"
+                  value={restoreConfirmation}
+                  onChange={(e) => setRestoreConfirmation(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase tracking-widest"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    setRestoreModalBackup(null);
+                    setRestoreConfirmation("");
+                  }}
+                  disabled={restoreLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRestoreBackup}
+                  disabled={restoreConfirmation.trim().toUpperCase() !== "RESTORE" || restoreLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${restoreLoading ? "animate-spin" : ""}`} />
+                  <span>{restoreLoading ? "Restoring Database..." : "Execute System Restore"}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Backup Snapshot Confirmation Modal */}
+      <AnimatePresence>
+        {deleteModalBackup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-slate-200 space-y-4"
+            >
+              <div className="flex items-center gap-2.5 text-rose-600">
+                <Trash2 className="w-5 h-5" />
+                <h3 className="font-bold text-slate-900 text-base">Delete Snapshot Archive</h3>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Are you sure you want to delete backup snapshot <strong className="font-mono text-slate-900">{deleteModalBackup.filename}</strong> ({deleteModalBackup.size_formatted})?
+                This archive file will be permanently removed from disk storage.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => setDeleteModalBackup(null)}
+                  disabled={deleteBackupLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteBackup}
+                  disabled={deleteBackupLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {deleteBackupLoading ? "Deleting..." : "Permanently Delete Archive"}
                 </button>
               </div>
             </motion.div>

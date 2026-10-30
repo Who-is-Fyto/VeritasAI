@@ -79,6 +79,16 @@ class MockCollection:
     async def delete_many(self, query):
         return True
 
+    async def insert_many(self, docs):
+        self.data.extend(docs)
+        return True
+
+    async def update_many(self, query, update):
+        if "$set" in update:
+            for item in self.data:
+                item.update(update["$set"])
+        return True
+
     def aggregate(self, pipeline):
         return self
 
@@ -114,6 +124,9 @@ class MockDatabase:
         self.api_keys = MockCollection([])
         self.audit_logs = MockCollection([])
         self.feedback = MockCollection([])
+
+    async def list_collection_names(self):
+        return ["users", "results", "api_keys", "audit_logs", "feedback"]
 
     def __getitem__(self, key):
         return getattr(self, key, MockCollection([]))
@@ -199,3 +212,75 @@ async def test_admin_telemetry_endpoint():
         assert data["status"] == "healthy"
         assert "storage" in data
         assert "collection_counts" in data
+
+
+@pytest.mark.asyncio
+async def test_admin_backup_rbac_rejects_unauthorized():
+    """Verify non-superadmin accounts cannot create, list, or restore backups."""
+    user_token = create_access_token("user-2")
+    headers = {"Authorization": f"Bearer {user_token}"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        res_post = await client.post("/api/v1/admin/backups", headers=headers)
+        assert res_post.status_code == 403
+
+        res_get = await client.get("/api/v1/admin/backups", headers=headers)
+        assert res_get.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_backup_lifecycle():
+    """Verify complete backup lifecycle: create, list, download, restore, and delete."""
+    admin_token = create_access_token("admin-1")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Create Backup
+        create_res = await client.post("/api/v1/admin/backups", headers=headers)
+        assert create_res.status_code == 201
+        meta = create_res.json()
+        filename = meta["filename"]
+        assert filename.endswith(".zip")
+        assert meta["total_documents"] >= 2
+        assert meta["status"] == "completed"
+        assert "checksum_sha256" in meta
+
+        # 2. List Backups
+        list_res = await client.get("/api/v1/admin/backups", headers=headers)
+        assert list_res.status_code == 200
+        list_data = list_res.json()
+        assert list_data["total"] >= 1
+        assert any(b["filename"] == filename for b in list_data["backups"])
+
+        # 3. Download Backup
+        download_res = await client.get(f"/api/v1/admin/backups/{filename}/download", headers=headers)
+        assert download_res.status_code == 200
+        assert download_res.headers["content-type"] == "application/zip"
+        assert len(download_res.content) > 0
+
+        # 4. Restore with Invalid Confirmation Safeguard
+        bad_restore_res = await client.post(
+            f"/api/v1/admin/backups/{filename}/restore",
+            json={"confirmation_text": "WRONG_PHRASE", "drop_existing": True},
+            headers=headers
+        )
+        assert bad_restore_res.status_code == 400
+        assert "Safety confirmation required" in bad_restore_res.json()["detail"]
+
+        # 5. Restore with Valid Confirmation
+        restore_res = await client.post(
+            f"/api/v1/admin/backups/{filename}/restore",
+            json={"confirmation_text": "RESTORE", "drop_existing": True},
+            headers=headers
+        )
+        assert restore_res.status_code == 200
+        restore_data = restore_res.json()
+        assert restore_data["status"] == "success"
+        assert restore_data["backup_filename"] == filename
+        assert restore_data["total_documents_restored"] >= 2
+
+        # 6. Delete Backup
+        delete_res = await client.delete(f"/api/v1/admin/backups/{filename}", headers=headers)
+        assert delete_res.status_code == 200
+        assert delete_res.json()["status"] == "success"
+

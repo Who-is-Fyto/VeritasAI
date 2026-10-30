@@ -83,8 +83,8 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Build an interactive User Management table with search, tier elevation, and account status controls.
 
 ### Phase 11: In-UI Database Backup & One-Click Restore Center
-- [ ] Implement backend backup engine generating compressed JSON/BSON archives of MongoDB collections directly via API.
-- [ ] Build in-UI Backup & Restore control panel inside `/admin`:
+- [x] Implement backend backup engine generating compressed JSON/BSON archives of MongoDB collections directly via API.
+- [x] Build in-UI Backup & Restore control panel inside `/admin`:
   - Immediate "Create System Backup" trigger with live status indicator.
   - Historical backup ledger (timestamp, filename, byte size, total record count).
   - One-click "Download Backup" mechanism.

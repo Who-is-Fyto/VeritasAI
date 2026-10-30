@@ -84,3 +84,38 @@ class AuditLogEntry(BaseModel):
 class AuditLogsResponse(BaseModel):
     logs: List[AuditLogEntry]
     total: int
+
+
+class BackupMetadata(BaseModel):
+    backup_id: str
+    filename: str
+    created_at: datetime
+    size_bytes: int
+    size_formatted: str
+    collections: Dict[str, int]
+    total_documents: int
+    checksum_sha256: Optional[str] = None
+    status: str = "completed"
+
+
+class BackupListResponse(BaseModel):
+    backups: List[BackupMetadata]
+    total: int
+    total_size_bytes: int
+    total_size_formatted: str
+
+
+class RestoreRequest(BaseModel):
+    confirmation_text: str = Field(..., description="Confirmation pass-phrase. Must be 'RESTORE'.")
+    drop_existing: bool = Field(True, description="Whether to clear existing documents before restore.")
+
+
+class RestoreResponse(BaseModel):
+    status: str = "success"
+    backup_filename: str
+    restored_at: datetime
+    collections_restored: Dict[str, int]
+    total_documents_restored: int
+    message: str
+    details: Dict[str, Any] = Field(default_factory=dict)
+

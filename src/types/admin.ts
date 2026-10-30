@@ -71,3 +71,33 @@ export interface AuditLogsResponse {
   logs: AuditLog[];
   total: number;
 }
+
+export interface BackupMetadata {
+  backup_id: string;
+  filename: string;
+  created_at: string;
+  size_bytes: number;
+  size_formatted: string;
+  collections: Record<string, number>;
+  total_documents: number;
+  checksum_sha256?: string;
+  status: "completed" | "in_progress" | "failed";
+}
+
+export interface BackupListResponse {
+  backups: BackupMetadata[];
+  total: number;
+  total_size_bytes: number;
+  total_size_formatted: string;
+}
+
+export interface RestoreResponse {
+  status: string;
+  backup_filename: string;
+  restored_at: string;
+  collections_restored: Record<string, number>;
+  total_documents_restored: number;
+  message: string;
+  details?: Record<string, any>;
+}
+

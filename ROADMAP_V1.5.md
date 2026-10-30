@@ -78,9 +78,9 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Build System Audit Log endpoints.
 
 ### Phase 10: Super Admin Management Dashboard (UI)
-- [ ] Build dedicated `/admin` dashboard route with role protection.
-- [ ] Create system overview cards: total verifications, active accounts, tier distribution, average credibility index, server status.
-- [ ] Build an interactive User Management table with search, tier elevation, and account status controls.
+- [x] Build dedicated `/admin` dashboard route with role protection.
+- [x] Create system overview cards: total verifications, active accounts, tier distribution, average credibility index, server status.
+- [x] Build an interactive User Management table with search, tier elevation, and account status controls.
 
 ### Phase 11: In-UI Database Backup & One-Click Restore Center
 - [ ] Implement backend backup engine generating compressed JSON/BSON archives of MongoDB collections directly via API.

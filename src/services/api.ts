@@ -14,6 +14,7 @@
  */
 
 import type { AnalysisResult, AnalyseRequest } from "../types/analysis";
+import type { AdminUser, AdminUserListResponse, DatabaseTelemetry, AuditLogsResponse } from "../types/admin";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -76,6 +77,236 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     }
     if (path.startsWith("/api/v1/admin/train/trigger")) {
       return { status: "success", message: "Training initiated" } as T;
+    }
+    if (path.startsWith("/api/v1/admin/telemetry/db")) {
+      return {
+        database_name: "veritasai",
+        status: "healthy",
+        latency_ms: 1.4,
+        storage: {
+          data_size_mb: 2.8,
+          storage_size_mb: 8.5,
+          indexes_size_mb: 1.2,
+          total_allocated_mb: 9.7,
+        },
+        collection_counts: {
+          users: 18,
+          results: 164,
+          api_keys: 12,
+          feedback: 42,
+          audit_logs: 89,
+        },
+        verifications_summary: {
+          total_analyses: 164,
+          average_credibility_score: 84.6,
+          credible_count: 122,
+          questionable_count: 28,
+          misinformation_count: 14,
+        },
+        server_time: new Date().toISOString(),
+        uptime_seconds: 86420,
+      } as T;
+    }
+    if (path.startsWith("/api/v1/admin/audit-logs")) {
+      return {
+        logs: [
+          {
+            id: "audit-1",
+            timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+            actor_id: "admin-1",
+            actor_email: "superadmin@veritas.ai",
+            action: "USER_TIER_MODIFIED",
+            target_id: "usr-2",
+            target_type: "user",
+            details: { previous_tier: "free", new_tier: "pro", user_email: "sarah.jenkins@reuters.com" },
+            ip_address: "127.0.0.1",
+          },
+          {
+            id: "audit-2",
+            timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+            actor_id: "admin-1",
+            actor_email: "superadmin@veritas.ai",
+            action: "ML_TRAIN_TRIGGERED",
+            target_type: "trainer",
+            details: { triggered_by: "superadmin@veritas.ai", samples_queued: 142 },
+            ip_address: "127.0.0.1",
+          },
+          {
+            id: "audit-3",
+            timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+            actor_id: "admin-1",
+            actor_email: "superadmin@veritas.ai",
+            action: "USER_SUSPENDED",
+            target_id: "usr-spam",
+            target_type: "user",
+            details: { user_email: "spammer@suspicious.net", reason: "Automated scraping abuse" },
+            ip_address: "192.168.1.15",
+          },
+          {
+            id: "audit-4",
+            timestamp: new Date(Date.now() - 1000 * 60 * 400).toISOString(),
+            actor_id: "system-bootstrap",
+            actor_email: "system@veritas.ai",
+            action: "SUPERADMIN_SEEDED",
+            target_id: "admin-1",
+            target_type: "user",
+            details: { email: "superadmin@veritas.ai", role: "superadmin" },
+            ip_address: "127.0.0.1",
+          },
+        ],
+        total: 4,
+      } as T;
+    }
+    if (path.startsWith("/api/v1/admin/users")) {
+      const mockUsers: AdminUser[] = [
+        {
+          id: "admin-1",
+          email: "superadmin@veritas.ai",
+          name: "VeritasAI Super Administrator",
+          joined_at: "2026-01-15T08:00:00Z",
+          role: "superadmin",
+          institution: "VeritasAI Governance Directorate",
+          account_type: "enterprise",
+          tier: "superadmin",
+          is_suspended: false,
+          daily_limit: 999999,
+          daily_used: 12,
+          total_verifications: 384,
+          last_active: new Date().toISOString(),
+        },
+        {
+          id: "usr-2",
+          email: "sarah.jenkins@reuters.com",
+          name: "Sarah Jenkins",
+          joined_at: "2026-03-10T14:22:00Z",
+          role: "Investigative Journalist",
+          institution: "Reuters News Agency",
+          account_type: "enterprise",
+          tier: "pro",
+          is_suspended: false,
+          daily_limit: 999999,
+          daily_used: 28,
+          total_verifications: 215,
+          last_active: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+        },
+        {
+          id: "usr-3",
+          email: "michael@student.richfield.ac.za",
+          name: "Michael Mazhambe",
+          joined_at: "2026-04-02T11:05:00Z",
+          role: "Postgraduate Researcher",
+          institution: "Richfield Graduate Institute of Technology",
+          student_id: "2023-RF-90412",
+          account_type: "academic",
+          tier: "academic",
+          is_suspended: false,
+          daily_limit: 999999,
+          daily_used: 8,
+          total_verifications: 147,
+          last_active: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+        },
+        {
+          id: "usr-4",
+          email: "david.m@theguardian.com",
+          name: "David Miller",
+          joined_at: "2026-06-18T09:30:00Z",
+          role: "Fact-Check Editor",
+          institution: "The Guardian",
+          account_type: "enterprise",
+          tier: "pro",
+          is_suspended: false,
+          daily_limit: 999999,
+          daily_used: 14,
+          total_verifications: 89,
+          last_active: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+        },
+        {
+          id: "usr-5",
+          email: "guest.demo@veritas.ai",
+          name: "Guest Demo Account",
+          joined_at: "2026-09-01T16:00:00Z",
+          role: "Base User",
+          institution: "Independent / General Public",
+          account_type: "base",
+          tier: "free",
+          is_suspended: false,
+          daily_limit: 5,
+          daily_used: 3,
+          total_verifications: 12,
+          last_active: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
+        },
+        {
+          id: "usr-spam",
+          email: "spammer@suspicious.net",
+          name: "Automated Bot Probe",
+          joined_at: "2026-10-12T02:14:00Z",
+          role: "Base User",
+          institution: "Unknown Proxy",
+          account_type: "base",
+          tier: "free",
+          is_suspended: true,
+          suspension_reason: "Automated scraping abuse and high-frequency token generation",
+          daily_limit: 5,
+          daily_used: 5,
+          total_verifications: 62,
+          last_active: new Date(Date.now() - 1000 * 60 * 1440).toISOString(),
+        },
+      ];
+
+      // Handle PATCH tier
+      if (options?.method === "PATCH" && path.includes("/tier")) {
+        const body = options.body ? JSON.parse(options.body as string) : {};
+        const uid = path.split("/")[5];
+        const user = mockUsers.find((u) => u.id === uid) || mockUsers[1];
+        user.tier = body.tier;
+        return user as T;
+      }
+
+      // Handle PATCH status (suspend)
+      if (options?.method === "PATCH" && path.includes("/status")) {
+        const body = options.body ? JSON.parse(options.body as string) : {};
+        const uid = path.split("/")[5];
+        const user = mockUsers.find((u) => u.id === uid) || mockUsers[1];
+        user.is_suspended = body.is_suspended;
+        user.suspension_reason = body.reason;
+        return user as T;
+      }
+
+      // Handle DELETE
+      if (options?.method === "DELETE") {
+        return { status: "success", message: "User permanently deleted." } as T;
+      }
+
+      // Handle GET list
+      const url = new URL(`http://dummy${path}`);
+      const search = url.searchParams.get("search")?.toLowerCase();
+      const tierFilter = url.searchParams.get("tier");
+      const statusFilter = url.searchParams.get("status");
+
+      let filtered = [...mockUsers];
+      if (search) {
+        filtered = filtered.filter(
+          (u) =>
+            u.name.toLowerCase().includes(search) ||
+            u.email.toLowerCase().includes(search) ||
+            (u.institution && u.institution.toLowerCase().includes(search))
+        );
+      }
+      if (tierFilter) {
+        filtered = filtered.filter((u) => u.tier === tierFilter);
+      }
+      if (statusFilter) {
+        if (statusFilter === "suspended") filtered = filtered.filter((u) => u.is_suspended);
+        if (statusFilter === "active") filtered = filtered.filter((u) => !u.is_suspended);
+      }
+
+      return {
+        users: filtered,
+        total: filtered.length,
+        page: 1,
+        limit: 20,
+        pages: 1,
+      } as T;
     }
     if (path.startsWith("/api/v1/results/") && path.endsWith("/feedback")) {
       return { status: "success" } as T;
@@ -265,6 +496,69 @@ export const veritasAPI = {
     request(`/api/v1/auth/keys/${id}`, {
       method: "DELETE",
     }),
+
+  /**
+   * GET /api/v1/admin/users
+   * List, search, and filter users with pagination.
+   */
+  adminGetUsers: (params?: { search?: string; tier?: string; status?: string; page?: number; limit?: number }): Promise<AdminUserListResponse> => {
+    const q = new URLSearchParams();
+    if (params?.search) q.set("search", params.search);
+    if (params?.tier) q.set("tier", params.tier);
+    if (params?.status) q.set("status", params.status);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return request(`/api/v1/admin/users${qs ? `?${qs}` : ""}`);
+  },
+
+  /**
+   * PATCH /api/v1/admin/users/:id/tier
+   * Promote or downgrade user account tier.
+   */
+  adminUpdateUserTier: (userId: string, tier: string): Promise<AdminUser> =>
+    request(`/api/v1/admin/users/${userId}/tier`, {
+      method: "PATCH",
+      body: JSON.stringify({ tier }),
+    }),
+
+  /**
+   * PATCH /api/v1/admin/users/:id/status
+   * Suspend or reinstate user account.
+   */
+  adminUpdateUserStatus: (userId: string, isSuspended: boolean, reason?: string): Promise<AdminUser> =>
+    request(`/api/v1/admin/users/${userId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_suspended: isSuspended, reason }),
+    }),
+
+  /**
+   * DELETE /api/v1/admin/users/:id
+   * Permanently purge user account and keys.
+   */
+  adminDeleteUser: (userId: string): Promise<{ status: string; message: string }> =>
+    request(`/api/v1/admin/users/${userId}`, {
+      method: "DELETE",
+    }),
+
+  /**
+   * GET /api/v1/admin/telemetry/db
+   * Retrieve live database storage, latency, and verification metrics.
+   */
+  adminGetDbTelemetry: (): Promise<DatabaseTelemetry> =>
+    request("/api/v1/admin/telemetry/db"),
+
+  /**
+   * GET /api/v1/admin/audit-logs
+   * Retrieve immutable administrative audit event records.
+   */
+  adminGetAuditLogs: (params?: { action?: string; limit?: number }): Promise<AuditLogsResponse> => {
+    const q = new URLSearchParams();
+    if (params?.action) q.set("action", params.action);
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return request(`/api/v1/admin/audit-logs${qs ? `?${qs}` : ""}`);
+  },
 };
 
 

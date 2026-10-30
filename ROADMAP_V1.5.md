@@ -91,8 +91,8 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
   - Secure "Restore System" trigger featuring double-confirmation safety modal and restore logs.
 
 ### Phase 12: Audit Certificate & Fact-Check Export Engine
-- [ ] Build print-ready "Export Credibility Certificate" feature in `Results.tsx`.
-- [ ] Generate clean, formatted PDF/Print layout with unique Verification ID, timestamp, breakdown scores, and highlighted Truth Map summary for researchers and journalists.
+- [x] Build print-ready "Export Credibility Certificate" feature in `Results.tsx`.
+- [x] Generate clean, formatted PDF/Print layout with unique Verification ID, timestamp, breakdown scores, and highlighted Truth Map summary for researchers and journalists.
 
 ### Phase 13: Full Integration, Mock & Real API Parity
 - [ ] Verify complete operational parity between offline mock mode (`VITE_USE_MOCK_API=true`) and live backend mode (`VITE_USE_MOCK_API=false`).

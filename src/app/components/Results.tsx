@@ -4,6 +4,7 @@ import { veritasAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { getTierConfig } from "../../utils/tierLimits";
 import { PricingModal } from "./PricingModal";
+import { AuditCertificateModal } from "./AuditCertificateModal";
 import { PipelineTracker } from "./PipelineTracker";
 import { CredibilityGauge } from "./CredibilityGauge";
 import { SourceNutritionLabel } from "./SourceNutritionLabel";
@@ -43,13 +44,24 @@ const CLIP_STYLES = `
     body, html {
       background: white !important;
       color: black !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
-    header, nav, .no-print, button, .flex-wrap, footer, .feedback-card {
+    header, nav, .no-print, button, footer, .feedback-card {
       display: none !important;
     }
     .min-h-screen {
       min-height: auto !important;
       padding: 0 !important;
+    }
+    #veritas-audit-certificate {
+      border: 2px solid #0f172a !important;
+      box-shadow: none !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin: 0 auto !important;
+      max-width: 100% !important;
+      padding: 24px !important;
     }
     .bg-gradient-to-br, .bg-white {
       background: none !important;
@@ -269,6 +281,7 @@ export function Results() {
   const { text: stateText, type: stateType, result } = location.state || {};
   const { tier, changeTier } = useAuth();
   const [pricingOpen, setPricingOpen] = useState(false);
+  const [certificateOpen, setCertificateOpen] = useState(false);
   const tierConfig = getTierConfig(tier);
 
   const [loading, setLoading] = useState(false);
@@ -491,7 +504,14 @@ export function Results() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+                <button
+                  onClick={() => setCertificateOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Audit Certificate</span>
+                </button>
+                <span className="text-[11px] font-mono text-slate-500 hidden md:inline">
                   Ensemble v1.5 (RoBERTa + MediaBias + NewsWire)
                 </span>
                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${credibilityConfig.badgeClass}`}>
@@ -898,11 +918,25 @@ export function Results() {
           <div className="flex flex-wrap items-center justify-center gap-4 no-print mt-8">
             <button
               onClick={() => navigate("/verify")}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-lg hover:from-blue-800 hover:to-blue-600 transition-all shadow-sm hover:shadow-md clip-corner-sm cursor-pointer"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-lg hover:from-blue-800 hover:to-blue-600 transition-all shadow-sm hover:shadow-md clip-corner-sm cursor-pointer font-semibold text-sm"
             >
               <Sparkles className="w-4 h-4" />
-              Analyse New Content
+              <span>Analyse New Content</span>
             </button>
+
+            <button
+              onClick={() => setCertificateOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm hover:shadow-md clip-corner-sm cursor-pointer font-semibold text-sm"
+            >
+              <Award className="w-4 h-4 text-amber-400" />
+              <span>Export Credibility Certificate</span>
+              {!tierConfig.allowsPdfExport && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40 uppercase">
+                  PRO
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => {
                 if (!tierConfig.allowsPdfExport) {
@@ -911,7 +945,7 @@ export function Results() {
                 }
                 window.print();
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer font-semibold shadow-xs"
+              className="flex items-center gap-2 px-6 py-3 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer font-semibold shadow-xs text-sm"
             >
               <Download className="w-4 h-4" />
               <span>Export Full Report</span>
@@ -924,6 +958,26 @@ export function Results() {
           </div>
         </motion.div>
       </div>
+
+      {/* Official Credibility Audit Certificate Modal */}
+      <AuditCertificateModal
+        open={certificateOpen}
+        onOpenChange={setCertificateOpen}
+        resultId={id}
+        result={loadedResult}
+        overallScore={overallScore}
+        linguisticScore={linguisticScore}
+        sourceCredibility={sourceCredibility}
+        factCheckScore={factCheckScore}
+        aiProbability={aiProbability}
+        sources={sources}
+        claims={claims}
+        linguisticFlags={linguisticFlags}
+        text={text}
+        type={type}
+        tier={tier}
+        onUpgradeRequired={() => setPricingOpen(true)}
+      />
 
       {/* Commercial Account Tiers Modal */}
       <PricingModal

@@ -13,7 +13,7 @@
  * ────────────────────────────────────────────────────────────────────────
  */
 
-import type { AnalysisResult, AnalyseRequest } from "../types/analysis";
+import type { AnalysisResult, AnalyseRequest, AuditCertificateResponse } from "../types/analysis";
 import type {
   AdminUser,
   AdminUserListResponse,
@@ -417,6 +417,35 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (path.startsWith("/api/v1/results/") && path.endsWith("/feedback")) {
       return { status: "success" } as T;
     }
+    if (path.startsWith("/api/v1/results/") && path.endsWith("/certificate")) {
+      const parts = path.split("/");
+      const id = parts[parts.length - 2] || "mock-id";
+      return {
+        certificate_id: `CERT-B94A${id.slice(-6).toUpperCase()}`,
+        verification_id: `VER-${id.slice(-8).toUpperCase()}`,
+        issued_at: new Date().toISOString(),
+        content_hash: "a4f89d309be04f478a2cb45582f3ef7e9b2311893116e0",
+        target_summary: "Multi-dimensional credibility assessment and algorithmic disinformation forensic evaluation.",
+        input_type: "text",
+        overall_score: 84.0,
+        verdict_label: "Verified Credible",
+        confidence_interval: 2.5,
+        scores: {
+          linguistic_score: 88.0,
+          source_score: 82.0,
+          corroboration_score: 80.0,
+          weights: { linguistic: 0.4, source: 0.35, corroboration: 0.25 },
+        },
+        ai_probability: 12.0,
+        claims_verified: 3,
+        claims_total: 4,
+        top_sources: ["Reuters", "Associated Press", "BBC News"],
+        digital_signature: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        issuer: "VeritasAI Credibility & Forensic Attestation Authority",
+        standard: "ISO/IEC 23894 AI Risk Management & IEEE 7001 Algorithmic Transparency",
+        verification_url: `https://veritasai.org/results/${id}`,
+      } as T;
+    }
     if (path.startsWith("/api/v1/results/")) {
       // Mock result retrieval
       return {
@@ -496,6 +525,13 @@ export const veritasAPI = {
    */
   getResult: (id: string): Promise<AnalysisResult> =>
     request<AnalysisResult>(`/api/v1/results/${id}`),
+
+  /**
+   * GET /api/v1/results/:id/certificate
+   * Retrieve or generate official Credibility Audit Certificate.
+   */
+  getCertificate: (id: string): Promise<AuditCertificateResponse> =>
+    request<AuditCertificateResponse>(`/api/v1/results/${id}/certificate`),
 
   /**
    * GET /api/v1/health

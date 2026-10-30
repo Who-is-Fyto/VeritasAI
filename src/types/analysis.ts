@@ -88,3 +88,25 @@ export interface AnalyseRequest {
   content: string;
   type: "text" | "url" | "upload";
 }
+
+/** Formal Credibility Audit Certificate */
+export interface AuditCertificateResponse {
+  certificate_id: string;
+  verification_id: string;
+  issued_at: string;
+  content_hash: string;
+  target_summary: string;
+  input_type: string;
+  overall_score: number;
+  verdict_label: string;
+  confidence_interval: number;
+  scores: WeightedScores;
+  ai_probability: number;
+  claims_verified: number;
+  claims_total: number;
+  top_sources: string[];
+  digital_signature: string;
+  issuer: string;
+  standard: string;
+  verification_url: string;
+}

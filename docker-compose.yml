@@ -54,14 +54,15 @@ services:
       - ./backend/main.py:/app/main.py
       # Mount model checkpoints without rebuilding the image
       - ./backend/models:/app/models:ro
+      - ./backend/roberta-base:/app/roberta-base:ro
     # Run uvicorn with --reload so it reloads automatically whenever Python files are modified
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
-      interval: 20s
-      timeout: 10s
-      retries: 6
-      start_period: 180s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 
 
@@ -84,8 +85,7 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
 
 
 volumes:

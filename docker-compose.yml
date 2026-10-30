@@ -10,8 +10,6 @@
 #   docker-compose up backend mongo    # backend + DB only
 #   docker-compose down                # stop all containers
 
-version: "3.9"
-
 services:
 
   # ── MongoDB ─────────────────────────────────────────────────────────────

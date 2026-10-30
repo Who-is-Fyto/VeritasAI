@@ -57,7 +57,15 @@ class BackupService:
         else:
             # Default to backend/backups
             self.backup_dir = Path(__file__).resolve().parent.parent.parent / "backups"
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            fallback = Path("/tmp/veritas_backups")
+            fallback.mkdir(parents=True, exist_ok=True)
+            logger.warning("Permission denied for %s. Falling back to %s", self.backup_dir, fallback)
+            self.backup_dir = fallback
+
         logger.info("BackupService initialised at: %s", self.backup_dir)
 
     def _sanitize_filename(self, filename: str) -> str:

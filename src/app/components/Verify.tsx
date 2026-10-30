@@ -77,7 +77,7 @@ export function Verify() {
   );
 
   // Push log messages for one step, resolves when all are added
-  const addLogsForStep = (stepIdx: number): Promise<void> =>
+  const addLogsForStep = (stepIdx: number, speedMs: number = 65): Promise<void> =>
     new Promise((resolve) => {
       const messages = PIPELINE_STEP_LOGS[stepIdx] ?? [];
       let i = 0;
@@ -85,7 +85,7 @@ export function Verify() {
         if (i < messages.length) {
           setLogMessages((prev) => [...prev, messages[i]]);
           i++;
-          setTimeout(push, 130 + Math.random() * 50);
+          setTimeout(push, speedMs + Math.random() * 20);
         } else {
           resolve();
         }
@@ -129,43 +129,33 @@ export function Verify() {
     const content = activeTab === "text" ? text.trim() : url.trim();
 
     try {
-      if (USE_MOCK_API) {
-        // ── Mock path: call mock analyse and animate pipeline steps ──
-        setAnalyzeStep(0);
-        const [result] = await Promise.all([
-          veritasAPI.analyse({ content, type: activeTab as "text" | "url" }),
-          addLogsForStep(0),
-        ]);
+      // Launch analysis API call concurrently with lively pipeline telemetry
+      const apiPromise = veritasAPI.analyse({ content, type: activeTab as "text" | "url" });
 
-        for (let i = 1; i < PIPELINE_STEPS.length; i++) {
-          setAnalyzeStep(i);
-          await addLogsForStep(i);
-          await new Promise((r) => setTimeout(r, 160));
-        }
+      // Run pipeline step telemetry concurrently
+      setAnalyzeStep(0);
+      await addLogsForStep(0, 60);
 
-        toast.success("Multimodal analysis complete! Loading Credibility Index Report.");
-        navigate(`/results/${result.id}`, {
-          state: { text: content, type: activeTab, result },
-        });
-      } else {
-        // ── Real path: call FastAPI backend ──
-        setAnalyzeStep(0);
-        // Run step 0 logs while the API call is in flight
-        const [result] = await Promise.all([
-          veritasAPI.analyse({ content, type: activeTab as "text" | "url" }),
-          addLogsForStep(0),
-        ]);
+      // Advance through intermediate steps while awaiting response
+      setAnalyzeStep(1);
+      await addLogsForStep(1, 60);
 
-        for (let i = 1; i < PIPELINE_STEPS.length; i++) {
-          setAnalyzeStep(i);
-          await addLogsForStep(i);
-        }
+      setAnalyzeStep(2);
+      await addLogsForStep(2, 60);
 
-        toast.success("Multimodal analysis complete! Loading Credibility Index Report.");
-        navigate(`/results/${result.id}`, {
-          state: { text: content, type: activeTab, result },
-        });
-      }
+      const result = await apiPromise;
+
+      setAnalyzeStep(3);
+      await addLogsForStep(3, 40);
+
+      setAnalyzeStep(4);
+      await addLogsForStep(4, 40);
+
+      toast.success("Multimodal analysis complete! Loading Credibility Index Report.");
+      setIsAnalyzing(false);
+      navigate(`/results/${result.id}`, {
+        state: { text: content, type: activeTab, result },
+      });
     } catch (err) {
       const msg =
         err instanceof VeritasAPIError

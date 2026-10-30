@@ -285,10 +285,11 @@ export function Results() {
   const [certificateOpen, setCertificateOpen] = useState(false);
   const tierConfig = getTierConfig(tier);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!result && Boolean(id));
   const [loadedResult, setLoadedResult] = useState<any>(result);
-  const [text, setText] = useState(stateText || "");
-  const [type, setType] = useState(stateType || "text");
+  const [text, setText] = useState(stateText || result?.content || "");
+  const [type, setType] = useState(stateType || result?.input_type || "text");
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [showCorrectionOptions, setShowCorrectionOptions] = useState(false);
@@ -299,19 +300,22 @@ export function Results() {
   useEffect(() => {
     if (!loadedResult && id) {
       setLoading(true);
+      setFetchError(null);
       veritasAPI.getResult(id)
         .then((res) => {
           setLoadedResult(res);
-          if (res.content && !text) setText(res.content);
+          if (res.content) setText(res.content);
           if (res.input_type) setType(res.input_type);
-          setLoading(false);
         })
         .catch((err) => {
           console.error("Failed to fetch result:", err);
+          setFetchError("Could not retrieve verification record from database cluster.");
+        })
+        .finally(() => {
           setLoading(false);
         });
     }
-  }, [id, loadedResult, text]);
+  }, [id, loadedResult]);
 
 
   const handleFeedback = async (isAccurate: boolean, correctedLabel: string) => {
@@ -404,7 +408,47 @@ export function Results() {
     );
   }
 
-  if (!text) {
+  if (fetchError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="text-center max-w-md p-8 bg-white border border-rose-200 rounded-2xl shadow-sm clip-corner-lg">
+          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-200">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">Report Retrieval Failed</h3>
+          <p className="text-sm text-slate-500 mb-6">{fetchError}</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                if (!id) return;
+                setLoading(true);
+                setFetchError(null);
+                veritasAPI.getResult(id)
+                  .then((res) => {
+                    setLoadedResult(res);
+                    if (res.content) setText(res.content);
+                    if (res.input_type) setType(res.input_type);
+                  })
+                  .catch(() => setFetchError("Could not retrieve verification record from database cluster."))
+                  .finally(() => setLoading(false));
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer"
+            >
+              Retry Retrieval
+            </button>
+            <button
+              onClick={() => navigate("/verify")}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+            >
+              Start New Analysis
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!text && !loadedResult) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -452,9 +496,9 @@ export function Results() {
     <div className="min-h-screen py-10 lg:py-16 bg-gradient-to-b from-blue-50/30 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
         >
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8 no-print">

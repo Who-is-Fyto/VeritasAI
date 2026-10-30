@@ -111,7 +111,8 @@ class CorroborationResult:
 
 class CorroborationService:
     def __init__(self) -> None:
-        logger.info("Enhanced CorroborationService initialised.")
+        self._claim_cache: dict[str, ClaimResult] = {}
+        logger.info("Enhanced CorroborationService initialised with claim cache.")
 
     async def analyse(self, text: str) -> CorroborationResult:
         claims_text = self._extract_claims(text)
@@ -134,9 +135,9 @@ class CorroborationService:
         if not claims_text:
             return CorroborationResult(score=65.0, claims=[])
 
-        # Verify claims concurrently across external registries
+        # Verify claims concurrently across external registries with strict bounds
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) VeritasAI-Scanner/1.5"}
-        async with httpx.AsyncClient(timeout=9, headers=headers) as client:
+        async with httpx.AsyncClient(timeout=4.5, headers=headers) as client:
             tasks = [self._verify_claim(claim, client) for claim in claims_text]
             verified_claims = await asyncio.gather(*tasks)
 
@@ -245,9 +246,13 @@ class CorroborationService:
         return salient_q, entity_q, concise_q
 
     async def _verify_claim(self, claim: str, client: httpx.AsyncClient) -> ClaimResult:
+        if claim in self._claim_cache:
+            logger.debug("Claim cache hit for: %s", claim[:60])
+            return self._claim_cache[claim]
+
         salient_query, entity_query, concise_query = self._extract_queries(claim)
         if not salient_query:
-            return ClaimResult(
+            res = ClaimResult(
                 claim=claim,
                 status="unverified",
                 confidence=35.0,
@@ -255,22 +260,24 @@ class CorroborationService:
                 explanation="Insufficient search terms to locate corroborating media records.",
                 source_links=[]
             )
+            self._claim_cache[claim] = res
+            return res
 
-        # 1. First Priority: Google Fact Check Tools API for certified reviews
+        # Concurrently execute certified Fact-Check + News RSS + Organic Press + NewsAPI + Wikipedia
         fact_check_queries = [concise_query, salient_query]
-        fact_check_result = await self._query_google_fact_check(fact_check_queries, claim, client)
-        if fact_check_result:
-            return fact_check_result
-
-        # 2. Concurrently query Google News RSS, DuckDuckGo, NewsAPI, and Wikipedia
+        fact_check_task = self._query_google_fact_check(fact_check_queries, claim, client)
         rss_task = self._query_google_news_rss(concise_query, claim, client)
         ddg_task = self._query_duckduckgo(concise_query, claim, client)
         news_task = self._query_news_api(salient_query, entity_query, claim, client)
         wiki_task = self._query_wikipedia(entity_query, claim, client)
 
-        rss_matches, ddg_matches, news_matches, wiki_match = await asyncio.gather(
-            rss_task, ddg_task, news_task, wiki_task
+        fact_check_result, rss_matches, ddg_matches, news_matches, wiki_match = await asyncio.gather(
+            fact_check_task, rss_task, ddg_task, news_task, wiki_task
         )
+
+        if fact_check_result:
+            self._claim_cache[claim] = fact_check_result
+            return fact_check_result
 
         all_matches = rss_matches + ddg_matches + news_matches
         refutation_sources: list[CorroboratingSource] = []
@@ -309,7 +316,7 @@ class CorroborationService:
         if refutation_sources:
             debunk_source = refutation_sources[0]
             confidence = min(85.0 + (len(refutation_sources) * 4.0), 96.0)
-            return ClaimResult(
+            res = ClaimResult(
                 claim=claim,
                 status="false",
                 confidence=confidence,
@@ -317,6 +324,8 @@ class CorroborationService:
                 explanation=f"Debunked by press and fact-checkers: '{debunk_source.title}'. Published reports refute this claim as false, a hoax, or lacking factual basis.",
                 source_links=refutation_sources[:3]
             )
+            self._claim_cache[claim] = res
+            return res
 
         # B. Corroborating evidence found from accredited press
         if corroborating_sources:
@@ -324,7 +333,7 @@ class CorroborationService:
             confidence = min(80.0 + (len(corroborating_sources) * 4.0), 96.0)
             top_publishers = [s.publisher for s in corroborating_sources[:3] if s.publisher]
             pub_str = ", ".join(top_publishers) if top_publishers else primary.publisher
-            return ClaimResult(
+            res = ClaimResult(
                 claim=claim,
                 status="verified",
                 confidence=confidence,
@@ -332,13 +341,16 @@ class CorroborationService:
                 explanation=f"Corroborated by {len(corroborating_sources)} independent news source(s) including {pub_str}.",
                 source_links=corroborating_sources[:4]
             )
+            self._claim_cache[claim] = res
+            return res
 
         # C. Wikipedia Ground Truth match
         if wiki_match:
+            self._claim_cache[claim] = wiki_match
             return wiki_match
 
         # D. Unverified statement
-        return ClaimResult(
+        res = ClaimResult(
             claim=claim,
             status="unverified",
             confidence=45.0,
@@ -346,6 +358,8 @@ class CorroborationService:
             explanation="No corroborating reports found in indexed press archives or certified fact-check databases.",
             source_links=[]
         )
+        self._claim_cache[claim] = res
+        return res
 
     async def _query_google_news_rss(self, query: str, claim: str, client: httpx.AsyncClient) -> list[dict]:
         """Query Google News RSS feed for live global news coverage across accredited publishers."""
@@ -355,7 +369,7 @@ class CorroborationService:
             resp = await client.get(
                 "https://news.google.com/rss/search",
                 params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
-                timeout=5.0
+                timeout=3.0
             )
             if resp.status_code != 200:
                 return []
@@ -402,7 +416,7 @@ class CorroborationService:
             resp = await client.post(
                 "https://html.duckduckgo.com/html/",
                 data={"q": query},
-                timeout=5.0
+                timeout=3.0
             )
             if resp.status_code != 200:
                 return []
@@ -512,7 +526,7 @@ class CorroborationService:
             return None
 
         seen_queries = set()
-        for query in queries:
+        for query in queries[:2]:
             if not query or query in seen_queries:
                 continue
             seen_queries.add(query)
@@ -521,7 +535,7 @@ class CorroborationService:
                 resp = await client.get(
                     "https://factchecktools.googleapis.com/v1alpha1/claims:search",
                     params={"query": query, "key": settings.google_api_key, "languageCode": "en"},
-                    timeout=5.0
+                    timeout=3.0
                 )
                 if resp.status_code != 200:
                     continue
@@ -602,7 +616,7 @@ class CorroborationService:
                         "pageSize": 5,
                         "apiKey": settings.news_api_key,
                     },
-                    timeout=5.0
+                    timeout=3.0
                 )
                 if resp.status_code != 200:
                     continue
@@ -649,7 +663,7 @@ class CorroborationService:
                     "key": settings.google_api_key,
                     "num": 4,
                 },
-                timeout=5.0
+                timeout=3.0
             )
             if resp.status_code != 200:
                 return []
@@ -690,21 +704,19 @@ class CorroborationService:
             candidate_queries: list[str] = []
             if quoted_terms:
                 candidate_queries.append(f"\"{quoted_terms[0]}\"")
-                if actors:
-                    candidate_queries.append(f"\"{quoted_terms[0]}\" {actors[0]}")
-            if query:
+            elif query:
                 candidate_queries.append(query)
-            if actors:
+            elif actors:
                 candidate_queries.append(" ".join(actors[:2]))
 
             visited_titles: set[str] = set()
 
-            for q in candidate_queries:
+            for q in candidate_queries[:2]:
                 search_resp = await client.get(
                     "https://en.wikipedia.org/w/api.php",
-                    params={"action": "query", "list": "search", "srsearch": q, "format": "json", "srlimit": 3},
+                    params={"action": "query", "list": "search", "srsearch": q, "format": "json", "srlimit": 2},
                     headers=headers,
-                    timeout=5.0
+                    timeout=2.5
                 )
                 titles: list[str] = []
                 if search_resp.status_code == 200:
@@ -714,15 +726,15 @@ class CorroborationService:
                 if not titles:
                     opensearch_resp = await client.get(
                         "https://en.wikipedia.org/w/api.php",
-                        params={"action": "opensearch", "search": q, "limit": 3, "namespace": 0, "format": "json"},
+                        params={"action": "opensearch", "search": q, "limit": 2, "namespace": 0, "format": "json"},
                         headers=headers,
-                        timeout=5.0
+                        timeout=2.5
                     )
                     if opensearch_resp.status_code == 200:
                         data = opensearch_resp.json()
                         titles = data[1] if len(data) > 1 else []
 
-                for top_title in titles:
+                for top_title in titles[:2]:
                     if top_title in visited_titles:
                         continue
                     visited_titles.add(top_title)
@@ -731,7 +743,7 @@ class CorroborationService:
                     sum_resp = await client.get(
                         f"https://en.wikipedia.org/api/rest_v1/page/summary/{safe_title}",
                         headers=headers,
-                        timeout=5.0
+                        timeout=2.5
                     )
                     if sum_resp.status_code == 200:
                         extract = sum_resp.json().get("extract") or ""

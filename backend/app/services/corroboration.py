@@ -135,14 +135,36 @@ class CorroborationService:
         if not claims_text:
             return CorroborationResult(score=65.0, claims=[])
 
-        # Verify claims concurrently across external registries with strict bounds
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) VeritasAI-Scanner/1.5"}
-        async with httpx.AsyncClient(timeout=4.5, headers=headers) as client:
-            tasks = [self._verify_claim(claim, client) for claim in claims_text]
-            verified_claims = await asyncio.gather(*tasks)
+        # Extract document-level context terms (years, primary entities, topic nouns)
+        doc_years = re.findall(r"\b(1[89]\d{2}|20\d{2})\b", text)
+        doc_actors = self._extract_primary_actors(text[:300])
+        context_terms: list[str] = []
+        if doc_years:
+            context_terms.append(doc_years[0])
+        for a in doc_actors:
+            for tok in a.split():
+                if tok.lower() not in STOPWORDS and tok not in context_terms:
+                    context_terms.append(tok)
+        doc_nouns = [w for w in re.findall(r"\b[a-zA-Z]{3,}s\b", text.lower()) if w not in STOPWORDS]
+        for dw in doc_nouns:
+            if dw not in context_terms and len(context_terms) < 6:
+                context_terms.append(dw)
 
-        score = self._aggregate_score(list(verified_claims))
-        return CorroborationResult(score=score, claims=list(verified_claims))
+        # Verify claims across external registries with strict bounds
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+        cached_intro_extracts: dict[str, str] = {}
+        async with httpx.AsyncClient(timeout=7.0, headers=headers) as client:
+            verified_claims: list[ClaimResult] = []
+            for claim in claims_text:
+                res = await self._verify_claim(claim, client, context_terms, cached_intro_extracts)
+                for s in res.source_links:
+                    if "Wikipedia: " in s.title and s.snippet:
+                        page_title = s.title.replace("Wikipedia: ", "").strip()
+                        cached_intro_extracts[page_title] = s.snippet
+                verified_claims.append(res)
+
+        score = self._aggregate_score(verified_claims)
+        return CorroborationResult(score=score, claims=verified_claims)
 
     def _extract_claims(self, text: str) -> list[str]:
         """Extract up to 4 salient factual candidate statements from text, stripping media captions and datelines."""
@@ -214,43 +236,109 @@ class CorroborationService:
 
         return actors
 
-    def _extract_queries(self, claim: str) -> tuple[str, str, str]:
-        """Construct primary entity+predicate query, entity query, and salient keyword query."""
+    def _extract_queries(self, claim: str, context_terms: list[str] | None = None) -> tuple[str, str, str]:
+        """Construct primary salient keyword query, entity query, and concise search query."""
         cleaned = re.sub(r"^(according to|reported by|claims that|states that)\s+[^,]+,\s*", "", claim, flags=re.IGNORECASE)
         actors = self._extract_primary_actors(cleaned)
         all_words = re.findall(r"\b[a-zA-Z0-9\.\-%]{2,}\b", cleaned)
 
-        # Identify action or key verb/noun
-        action_word = None
-        for w in all_words:
-            if any(w.lower().startswith(root) for root in ACTION_ROOTS):
-                action_word = w.lower()
-                break
+        # 1. 4-digit years or numeric anchors
+        years = re.findall(r"\b(1[89]\d{2}|20\d{2})\b", cleaned)
 
-        if actors:
-            primary_entity = actors[0]
-            if action_word:
-                concise_q = f'"{primary_entity}" {action_word}'
-            elif len(actors) > 1:
-                concise_q = f'"{primary_entity}" "{actors[1]}"'
-            else:
-                concise_q = f'"{primary_entity}"'
-            entity_q = f'"{primary_entity}"'
-        else:
-            concise_q = " ".join([w for w in all_words if w.lower() not in STOPWORDS][:4])
-            entity_q = concise_q
+        # 2. Extract primary actor tokens (deduplicating stems)
+        actor_tokens: list[str] = []
+        seen_stems: set[str] = set()
+        for a in actors:
+            for tok in a.split():
+                st = _stem(tok.lower())
+                if tok.lower() not in STOPWORDS and st not in seen_stems:
+                    seen_stems.add(st)
+                    actor_tokens.append(tok)
 
-        salient_words = [w for w in all_words if w.lower() not in STOPWORDS]
-        salient_q = " ".join(salient_words[:5])
+        # 3. Substantive content words (filtering out reporting fillers)
+        reporting_fillers = {
+            "according", "report", "reported", "reports", "state", "stated", "states",
+            "claim", "claims", "claimed", "official", "officials", "government",
+            "personnel", "active-duty", "statement", "announced", "spokesperson",
+            "sources", "bystanders", "unverified", "population", "massive", "proved",
+            "incident", "details", "following", "recent", "recently", "deployed",
+            "combat", "destroying", "scattering", "rapidly", "ultimately", "forced"
+        }
+        substantive = [
+            w for w in all_words
+            if w.lower() not in STOPWORDS and w.lower() not in reporting_fillers and _stem(w.lower()) not in seen_stems and not w.isdigit()
+        ]
+
+        # If claim lacks actors (continuation statement), incorporate context terms
+        if context_terms and (not actors or len(actor_tokens) < 2):
+            for ct in context_terms:
+                st = _stem(ct.lower())
+                if st not in seen_stems and ct.lower() not in STOPWORDS:
+                    actor_tokens.append(ct)
+                    seen_stems.add(st)
+
+        # Build concise query: Year (if any) + Actor tokens + Substantive topic nouns
+        concise_tokens: list[str] = []
+        if years:
+            concise_tokens.append(years[0])
+        concise_tokens.extend(actor_tokens[:2])
+
+        # Prioritize key topic nouns (e.g., words ending with 's' or substantive terms)
+        topic_nouns = [w for w in substantive if w.lower().endswith("s") or len(w) >= 4]
+        for tn in (topic_nouns or substantive):
+            if tn not in concise_tokens and len(concise_tokens) < 5:
+                concise_tokens.append(tn)
+
+        concise_q = " ".join(concise_tokens[:5])
+
+        # Build salient query: up to 8 descriptive terms
+        salient_tokens = list(concise_tokens)
+        for w in substantive:
+            if w not in salient_tokens and len(salient_tokens) < 8:
+                salient_tokens.append(w)
+        salient_q = " ".join(salient_tokens[:8])
+
+        entity_q = actor_tokens[0] if actor_tokens else (substantive[0] if substantive else "")
 
         return salient_q, entity_q, concise_q
 
-    async def _verify_claim(self, claim: str, client: httpx.AsyncClient) -> ClaimResult:
+    async def _verify_claim(
+        self,
+        claim: str,
+        client: httpx.AsyncClient,
+        context_terms: list[str] | None = None,
+        cached_intro_extracts: dict[str, str] | None = None
+    ) -> ClaimResult:
         if claim in self._claim_cache:
             logger.debug("Claim cache hit for: %s", claim[:60])
             return self._claim_cache[claim]
 
-        salient_query, entity_query, concise_query = self._extract_queries(claim)
+        # Check against cached introductory extracts from the current document
+        if cached_intro_extracts:
+            for page_title, extract_text in cached_intro_extracts.items():
+                sim = self._compute_overlap(claim, extract_text)
+                if self._is_claim_relevant(claim, extract_text, min_sim=0.16):
+                    safe_title = page_title.replace(" ", "_")
+                    res = ClaimResult(
+                        claim=claim,
+                        status="verified",
+                        confidence=min(round(max(sim * 100, 84.0), 1), 94.0),
+                        sources=1,
+                        explanation=f"Corroborated by encyclopedic archive on Wikipedia: '{page_title}'.",
+                        source_links=[
+                            CorroboratingSource(
+                                title=f"Wikipedia: {page_title}",
+                                url=f"https://en.wikipedia.org/wiki/{safe_title}",
+                                publisher="Wikipedia Knowledge Base",
+                                similarity_score=round(max(sim * 100, 84.0), 1),
+                                snippet=extract_text[:220] + "..." if len(extract_text) > 220 else extract_text
+                            )
+                        ]
+                    )
+                    self._claim_cache[claim] = res
+                    return res
+
+        salient_query, entity_query, concise_query = self._extract_queries(claim, context_terms)
         if not salient_query:
             res = ClaimResult(
                 claim=claim,
@@ -269,7 +357,7 @@ class CorroborationService:
         rss_task = self._query_google_news_rss(concise_query, claim, client)
         ddg_task = self._query_duckduckgo(concise_query, claim, client)
         news_task = self._query_news_api(salient_query, entity_query, claim, client)
-        wiki_task = self._query_wikipedia(entity_query, claim, client)
+        wiki_task = self._query_wikipedia(entity_query, salient_query, claim, client)
 
         fact_check_result, rss_matches, ddg_matches, news_matches, wiki_match = await asyncio.gather(
             fact_check_task, rss_task, ddg_task, news_task, wiki_task
@@ -283,6 +371,12 @@ class CorroborationService:
         refutation_sources: list[CorroboratingSource] = []
         corroborating_sources: list[CorroboratingSource] = []
         seen_domains: set[str] = set()
+
+        # If Wikipedia match found, include in corroborating sources
+        if wiki_match and wiki_match.source_links:
+            corroborating_sources.extend(wiki_match.source_links)
+            for sl in wiki_match.source_links:
+                seen_domains.add(sl.publisher.lower().strip() if sl.publisher else "wikipedia")
 
         for item in all_matches:
             title = item.get("title", "")
@@ -306,6 +400,10 @@ class CorroborationService:
             )
 
             # Stance & Refutation Detection
+            if any(rm in full_snippet for rm in REFUTATION_KEYWORDS):
+                refutation_sources.append(source_obj)
+            else:
+                corroborating_sources.append(source_obj)
             if any(rm in full_snippet for rm in REFUTATION_KEYWORDS):
                 refutation_sources.append(source_obj)
             else:
@@ -390,7 +488,7 @@ class CorroborationService:
                 if not clean_title:
                     clean_title = raw_title
 
-                if not self._is_claim_relevant(claim, clean_title, min_sim=0.35):
+                if not self._is_claim_relevant(claim, clean_title, min_sim=0.18):
                     continue
 
                 sim = self._compute_overlap(claim, clean_title)
@@ -413,10 +511,12 @@ class CorroborationService:
         if not query:
             return []
         try:
+            browser_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
             resp = await client.post(
                 "https://html.duckduckgo.com/html/",
                 data={"q": query},
-                timeout=3.0
+                headers=browser_headers,
+                timeout=3.5
             )
             if resp.status_code != 200:
                 return []
@@ -438,7 +538,7 @@ class CorroborationService:
                     continue
 
                 combined_candidate = f"{title} {snippet}"
-                if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.35):
+                if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.16):
                     continue
 
                 # Deduce publisher name from domain
@@ -458,7 +558,7 @@ class CorroborationService:
             logger.debug("DuckDuckGo search failed for '%s': %s", query, e)
             return []
 
-    def _is_claim_relevant(self, claim: str, candidate_text: str, min_sim: float = 0.35) -> bool:
+    def _is_claim_relevant(self, claim: str, candidate_text: str, min_sim: float = 0.20) -> bool:
         """
         Semantic overlap, predicate alignment, and subject anchoring safeguard:
         Verifies that candidate text is genuinely reporting on the same assertion
@@ -468,18 +568,15 @@ class CorroborationService:
         actors = self._extract_primary_actors(cleaned)
 
         # 1. Subject / Actor Anchoring Check:
-        # If the claim specifies primary subjects/actors, candidate text MUST mention at least one
+        cand_words = set(w.lower() for w in re.findall(r"\b[a-zA-Z0-9]{3,}\b", candidate_text))
+        cand_stems = set(_stem(w) for w in cand_words)
+        actor_found = False
         if actors:
-            cand_words = set(w.lower() for w in re.findall(r"\b[a-zA-Z0-9]{3,}\b", candidate_text))
-            cand_stems = set(_stem(w) for w in cand_words)
-            actor_found = False
             for a in actors:
                 a_tokens = [w.lower() for w in a.split()]
                 if any(tok in cand_words or _stem(tok) in cand_stems for tok in a_tokens):
                     actor_found = True
                     break
-            if not actor_found:
-                return False
 
         raw_c1 = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\.\-%]{3,}\b", cleaned) if w.lower() not in STOPWORDS]
         raw_c2 = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\.\-%]{3,}\b", candidate_text) if w.lower() not in STOPWORDS]
@@ -506,8 +603,12 @@ class CorroborationService:
             if non_actor_stems1 and not non_actor_intersection:
                 return False
 
-        effective_min_sim = max(min_sim, 0.35 if len(stems1) >= 5 else 0.28)
-        if sim < effective_min_sim:
+        # If actor was not explicitly matched, require stronger non-actor overlap (>= 3 stems and sim >= 0.20)
+        if actors and not actor_found:
+            if len(intersection) < 3 or sim < 0.20:
+                return False
+
+        if sim < min_sim:
             return False
 
         # 3. Action / Predicate alignment check
@@ -515,7 +616,7 @@ class CorroborationService:
         cand_actions = [root for root in ACTION_ROOTS if any(w.startswith(root) for w in stems2)]
 
         if claim_actions or cand_actions:
-            if not any(a in cand_actions for a in claim_actions) and sim < 0.35:
+            if not any(a in cand_actions for a in claim_actions) and sim < 0.30:
                 return False
 
         return True
@@ -694,29 +795,28 @@ class CorroborationService:
             logger.debug("Google CSE query failed: %s", e)
             return []
 
-    async def _query_wikipedia(self, query: str, claim: str, client: httpx.AsyncClient) -> ClaimResult | None:
-        """Query Wikipedia full-text search and REST summary for encyclopedic ground truth."""
+    async def _query_wikipedia(self, entity_query: str, salient_query: str, claim: str, client: httpx.AsyncClient) -> ClaimResult | None:
+        """Query Wikipedia full-text search and comprehensive intro extract for encyclopedic ground truth."""
         try:
             headers = {"User-Agent": "VeritasAI-Credibility-Scanner/1.5 (Dissertation Research: student@richfield.ac.za)"}
             quoted_terms = re.findall(r"\"([^\"]+)\"", claim)
-            actors = self._extract_primary_actors(claim)
 
             candidate_queries: list[str] = []
+            if salient_query:
+                candidate_queries.append(salient_query)
             if quoted_terms:
                 candidate_queries.append(f"\"{quoted_terms[0]}\"")
-            elif query:
-                candidate_queries.append(query)
-            elif actors:
-                candidate_queries.append(" ".join(actors[:2]))
+            if entity_query and entity_query not in candidate_queries:
+                candidate_queries.append(entity_query)
 
             visited_titles: set[str] = set()
 
             for q in candidate_queries[:2]:
                 search_resp = await client.get(
                     "https://en.wikipedia.org/w/api.php",
-                    params={"action": "query", "list": "search", "srsearch": q, "format": "json", "srlimit": 2},
+                    params={"action": "query", "list": "search", "srsearch": q, "format": "json", "srlimit": 3},
                     headers=headers,
-                    timeout=2.5
+                    timeout=3.0
                 )
                 titles: list[str] = []
                 if search_resp.status_code == 200:
@@ -728,7 +828,7 @@ class CorroborationService:
                         "https://en.wikipedia.org/w/api.php",
                         params={"action": "opensearch", "search": q, "limit": 2, "namespace": 0, "format": "json"},
                         headers=headers,
-                        timeout=2.5
+                        timeout=3.0
                     )
                     if opensearch_resp.status_code == 200:
                         data = opensearch_resp.json()
@@ -739,32 +839,58 @@ class CorroborationService:
                         continue
                     visited_titles.add(top_title)
 
-                    safe_title = top_title.replace(" ", "_")
-                    sum_resp = await client.get(
-                        f"https://en.wikipedia.org/api/rest_v1/page/summary/{safe_title}",
+                    # Fetch full introductory section via Action API
+                    ext_resp = await client.get(
+                        "https://en.wikipedia.org/w/api.php",
+                        params={
+                            "action": "query",
+                            "prop": "extracts",
+                            "exintro": 1,
+                            "explaintext": 1,
+                            "titles": top_title,
+                            "format": "json"
+                        },
                         headers=headers,
-                        timeout=2.5
+                        timeout=3.0
                     )
-                    if sum_resp.status_code == 200:
-                        extract = sum_resp.json().get("extract") or ""
-                        sim = self._compute_overlap(claim, extract)
-                        if self._is_claim_relevant(claim, extract, min_sim=0.18):
-                            return ClaimResult(
-                                claim=claim,
-                                status="verified",
-                                confidence=88.0,
-                                sources=1,
-                                explanation=f"Corroborated by encyclopedic archive on Wikipedia: '{top_title}'.",
-                                source_links=[
-                                    CorroboratingSource(
-                                        title=f"Wikipedia: {top_title}",
-                                        url=f"https://en.wikipedia.org/wiki/{safe_title}",
-                                        publisher="Wikipedia Knowledge Base",
-                                        similarity_score=round(max(sim * 100, 80.0), 1),
-                                        snippet=extract[:220] + "..." if len(extract) > 220 else extract
-                                    )
-                                ]
-                            )
+                    extract = ""
+                    if ext_resp.status_code == 200:
+                        pages = ext_resp.json().get("query", {}).get("pages", {})
+                        for pid, p in pages.items():
+                            extract = p.get("extract", "")
+
+                    if not extract:
+                        safe_title = top_title.replace(" ", "_")
+                        sum_resp = await client.get(
+                            f"https://en.wikipedia.org/api/rest_v1/page/summary/{safe_title}",
+                            headers=headers,
+                            timeout=2.5
+                        )
+                        if sum_resp.status_code == 200:
+                            extract = sum_resp.json().get("extract") or ""
+
+                    if not extract:
+                        continue
+
+                    sim = self._compute_overlap(claim, extract)
+                    if self._is_claim_relevant(claim, extract, min_sim=0.16):
+                        safe_title = top_title.replace(" ", "_")
+                        return ClaimResult(
+                            claim=claim,
+                            status="verified",
+                            confidence=min(round(max(sim * 100, 84.0), 1), 94.0),
+                            sources=1,
+                            explanation=f"Corroborated by encyclopedic archive on Wikipedia: '{top_title}'.",
+                            source_links=[
+                                CorroboratingSource(
+                                    title=f"Wikipedia: {top_title}",
+                                    url=f"https://en.wikipedia.org/wiki/{safe_title}",
+                                    publisher="Wikipedia Knowledge Base",
+                                    similarity_score=round(max(sim * 100, 84.0), 1),
+                                    snippet=extract[:220] + "..." if len(extract) > 220 else extract
+                                )
+                            ]
+                        )
         except Exception as e:
             logger.debug("Wikipedia query failed: %s", e)
         return None

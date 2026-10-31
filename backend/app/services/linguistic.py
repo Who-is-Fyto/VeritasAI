@@ -369,8 +369,15 @@ class LinguisticService:
             else:
                 model_score = 70.0
 
-            # Blend model score with heuristic absurdity penalty
-            final_score = min(model_score, heuristic_res.score)
+            # Blend model score with heuristic:
+            # If heuristic detected absurdity, satirical tropes, or manipulative framing, cap by heuristic
+            if heuristic_res.score <= 30.0:
+                final_score = min(model_score, heuristic_res.score)
+            elif heuristic_res.score >= 70.0:
+                # Factual realism passed, rich vocabulary; use ensemble prioritizing heuristic reliability
+                final_score = round(0.70 * heuristic_res.score + 0.30 * model_score, 1)
+            else:
+                final_score = round(0.60 * heuristic_res.score + 0.40 * model_score, 1)
             ai_prob = heuristic_res.ai_probability
             ai_forensics = heuristic_res.ai_forensics
 
@@ -503,10 +510,14 @@ class LinguisticService:
         mean_len = np.mean(lengths) if lengths else 1.0
         std_len = np.std(lengths) if len(lengths) > 1 else 0.0
         
-        if len(lengths) > 1:
+        if len(lengths) > 3:
             cv = std_len / mean_len if mean_len > 0 else 0.5
-            burst_rating = f"CV: {cv:.2f} — " + ("Natural human cadence" if cv >= 0.35 else "Monotonous uniform cadence")
-            burst_ok = cv >= 0.35
+            burst_rating = f"CV: {cv:.2f} — " + ("Natural human cadence" if cv >= 0.30 else "Monotonous uniform cadence")
+            burst_ok = cv >= 0.30
+        elif len(lengths) > 1:
+            cv = std_len / mean_len if mean_len > 0 else 0.5
+            burst_rating = f"CV: {cv:.2f} — Natural concise cadence"
+            burst_ok = True
         else:
             burst_rating = "Standard single-statement cadence"
             burst_ok = True

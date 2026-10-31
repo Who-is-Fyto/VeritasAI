@@ -90,6 +90,11 @@ KNOWN_SOURCES = {
     "arstechnica.com": {"name": "Ars Technica", "credibility": 92.0, "status": "verified"},
     "wired.com": {"name": "Wired", "credibility": 90.0, "status": "verified"},
 
+    # ── Authoritative Knowledge Bases & Encyclopedias (90–95) ──
+    "wikipedia.org": {"name": "Wikipedia Knowledge Base", "credibility": 90.0, "status": "verified"},
+    "en.wikipedia.org": {"name": "Wikipedia Knowledge Base", "credibility": 90.0, "status": "verified"},
+    "britannica.com": {"name": "Encyclopaedia Britannica", "credibility": 95.0, "status": "verified"},
+
     # ── Policy Think Tanks & Research Institutes (92–96) ──
     "rand.org": {"name": "RAND Corporation", "credibility": 94.0, "status": "verified"},
     "brookings.edu": {"name": "Brookings Institution", "credibility": 94.0, "status": "verified"},
@@ -147,6 +152,8 @@ KNOWN_SOURCES = {
     "natural news": {"name": "Natural News", "credibility": 12.0, "status": "questionable"},
     "the onion": {"name": "The Onion", "credibility": 20.0, "status": "questionable"},
     "babylon bee": {"name": "The Babylon Bee", "credibility": 20.0, "status": "questionable"},
+    "wikipedia": {"name": "Wikipedia Knowledge Base", "credibility": 90.0, "status": "verified"},
+    "britannica": {"name": "Encyclopaedia Britannica", "credibility": 95.0, "status": "verified"},
 }
 
 

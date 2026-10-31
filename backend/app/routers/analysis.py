@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import logging
 import uuid
+from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,9 +22,9 @@ from app.config import settings
 from app.db.mongodb import get_db
 from app.schemas.auth import UserResponse
 from app.schemas.request import AnalyseRequest
-from app.schemas.response import AnalysisResult, WeightedScores, AuditCertificateResponse
+from app.schemas.response import AnalysisResult, WeightedScores, AuditCertificateResponse, SourceResult
 from app.services.linguistic import linguistic_service
-from app.services.source import source_service
+from app.services.source import source_service, KNOWN_SOURCES
 from app.services.corroboration import corroboration_service
 
 from app.utils.security import is_safe_url, sanitize_text
@@ -142,6 +143,53 @@ async def analyse(
     linguistic_result, source_result, corroboration_result = await asyncio.gather(
         linguistic_task, source_task, corroboration_task
     )
+
+    # If text/document input without explicit publisher attribution, populate sources from verified corroborating records
+    if body.type in ("text", "document") and not source_result.sources:
+        discovered_sources: list[SourceResult] = []
+        seen_pubs: set[str] = set()
+
+        for clm in corroboration_result.claims:
+            for sl in clm.source_links:
+                pub_name = sl.publisher or "Independent Press"
+                pub_clean = pub_name.strip()
+                if pub_clean.lower() in seen_pubs:
+                    continue
+                seen_pubs.add(pub_clean.lower())
+
+                # Determine authoritative credibility
+                credibility = 86.0
+                src_domain = ""
+                if sl.url:
+                    try:
+                        src_domain = urlparse(sl.url).netloc.lower().replace("www.", "")
+                    except Exception:
+                        src_domain = ""
+
+                if "wikipedia" in pub_clean.lower() or "wikipedia.org" in src_domain:
+                    credibility = 90.0
+                elif "britannica" in pub_clean.lower() or "britannica.com" in src_domain:
+                    credibility = 95.0
+                elif src_domain.endswith(".gov") or src_domain.endswith(".edu"):
+                    credibility = 95.0
+                elif src_domain in KNOWN_SOURCES:
+                    credibility = KNOWN_SOURCES[src_domain]["credibility"]
+                elif clm.status == "verified":
+                    credibility = min(max(sl.similarity_score or 85.0, 85.0), 94.0)
+
+                discovered_sources.append(
+                    SourceResult(
+                        name=pub_clean,
+                        url=sl.url,
+                        credibility=round(credibility, 1),
+                        status="verified" if credibility >= 60.0 else "questionable",
+                        matches=1
+                    )
+                )
+
+        if discovered_sources:
+            source_result.sources = discovered_sources
+            source_result.score = round(sum(s.credibility for s in discovered_sources) / len(discovered_sources), 1)
 
     # ── Compute overall score ────────────────────────────────────────────
     overall = compute_overall_score(

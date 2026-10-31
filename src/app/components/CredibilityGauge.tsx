@@ -416,7 +416,7 @@ export function CredibilityGauge({
       {/* Numeric Score Readout & CI Badge */}
       <div className="flex flex-col items-center mt-[-14px] text-center w-full">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
+          <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-slate-900">
             {boundedScore.toFixed(1)}
           </span>
           <span className="text-slate-400 font-bold text-sm">/ 100</span>

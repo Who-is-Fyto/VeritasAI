@@ -49,6 +49,7 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Redesign the primary 0-100 radial/semi-circular Credibility Index meter (PolitiFact Truth-O-Meter inspiration).
 - [x] Incorporate animated needle/progress arc with confidence interval indicators.
 - [x] Pair score with accessible verdict pills (Verified, Highly Credible, Caution / Questionable, Flagged as Disinformation) backed by dual icon + text markers.
+- [x] Implement theme-safe score rendering in `CredibilityGauge.tsx`, ensuring WCAG AAA contrast (`text-slate-900`) permanently decoupled from dark-mode inversion on white card containers.
 
 ### Phase 6: Source Authority "Nutrition Label"
 - [x] Redesign the 35% Source Authority panel into an investigative "Credibility Nutrition Label" (NewsGuard inspiration).
@@ -57,6 +58,7 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
   - Correction regularity and retraction handling.
   - Ownership transparency and political bias classification.
   - Domain age, registration security, and historic fact-check record.
+- [x] Implement Discovered Source Authority Bridging in `backend/app/routers/analysis.py`, dynamically mapping corroborating publishers (Wikipedia Knowledge Base, Encyclopaedia Britannica, accredited press) into `SourceResult` entries for uncredited text and document submissions.
 
 ### Phase 7: Interactive Truth Map with Floating XAI Popovers
 - [x] Overhaul sentence-level RoBERTa text annotation display in `Results.tsx` (Grammarly-style inline highlights).
@@ -70,6 +72,9 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
   - Paired box showing the verified conclusion and corroboration verdict.
   - Supporting source citations with domain credibility scores and timestamps.
 - [x] High-accuracy multi-source corroboration engine upgraded (ordered entity extraction, dateline & caption cleanup, Google News RSS live indexing, DuckDuckGo organic search fallback, lead-claim weighted aggregation).
+- [x] Implement smart keyword query formulation in `corroboration.py` (numeric anchors, deduplicated actor tokens, substantive nouns without strict query breaking quotes).
+- [x] Migrate Wikipedia search to Wikipedia Action API intro extracts (`prop=extracts&exintro=1&explaintext=1`) for deep contextual verification.
+- [x] Implement calibrated TF-IDF similarity thresholds (`min_sim=0.16–0.18`) and intra-document context propagation across multi-sentence paragraphs.
 
 ### Phase 9: Super Admin Backend Engine
 - [x] Implement role-based access control (RBAC) ensuring only `superadmin` can access administrative routes.
@@ -107,6 +112,8 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Implement multi-signal stylometrics in `backend/app/services/linguistic.py` (sentence-level burstiness variance, log-likelihood perplexity estimation, type-token lexical richness, and expanded 120+ synthetic LLM transition markers).
 - [x] Compute granular sentence-level AI probability ratings returned in the analysis payload.
 - [x] Build interactive Forensic Stylometrics Panel & Sentence Heatmap in `src/app/components/Results.tsx` (color-coded human/mixed/synthetic highlights, perplexity predictability meter, cadence variance distribution chart).
+- [x] Implement Hybrid Ensemble Scoring Architecture (70% heuristic + 30% transformer model for high-confidence factual syntax, strict minimum safety cap for manipulation flags).
+- [x] Calibrate cadence burstiness variance to recognize natural concise sentence distribution for short passages ($\le 3$ sentences).
 
 ---
 
@@ -119,4 +126,7 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 | **Account Tiers** | Free, Pro, Academic tier definitions; feature-gated deep scans; upgrade modal | `src/context/AuthContext.tsx`, `backend/app/schemas/auth.py` |
 | **Super Admin** | Role-gated management portal for users, system metrics, and audit logs | `src/app/components/AdminDashboard.tsx`, `backend/app/routers/admin.py` |
 | **In-UI Backup & Restore** | Direct browser-initiated backup creation, archive download, and one-click database restore | `src/app/components/AdminDashboard.tsx`, `backend/app/routers/admin.py` |
-| **AI Text Detection** | Dual-signal hybrid engine (fine-tuned transformer checkpoint + burstiness/perplexity stylometrics + sentence heatmap) | `src/app/components/Results.tsx`, `backend/app/services/linguistic.py` |
+| **AI Text Detection & Hybrid Scoring** | Dual-signal hybrid engine (fine-tuned transformer checkpoint + stylometrics + 70/30 heuristic ensemble + sentence heatmap) | `src/app/components/Results.tsx`, `backend/app/services/linguistic.py` |
+| **Corroboration & Action API** | Multi-engine corroboration (smart keyword formulation, Wikipedia Action API full intro extracts, DuckDuckGo organic fallback, Google News RSS, context propagation) | `backend/app/services/corroboration.py` |
+| **Source Authority Bridging** | Automated extraction of authoritative corroborating domains (Wikipedia 90%, Britannica 95%, `.gov`/`.edu` 95%) for uncredited text and documents | `backend/app/routers/analysis.py`, `backend/app/services/source.py` |
+| **Theme-Safe Visual Integrity** | High-contrast score rendering (`text-slate-900`) permanently decoupled from dark mode preference on white cards; WCAG AAA compliance | `src/app/components/CredibilityGauge.tsx` |

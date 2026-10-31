@@ -79,7 +79,9 @@ We added a content hashing and caching layer in MongoDB:
        "submitted_at": {"$gte": two_hours_ago}
    })
    ```
-3. **Instant Response:** On cache hit, the stored scores, XAI annotations, sources, and claims are reused with a fresh report ID, returning in **under 20 milliseconds** instead of 4 seconds!
+3. **Instant Response & Document Fidelity:** On cache hit, the stored scores, XAI annotations, sources (including Discovered Source Authority Bridging records for pasted texts), and verified claim linkages are reused with a fresh report ID, returning in **under 20 milliseconds** instead of 4 seconds!
+4. **Preservation of Discovered Corroborating Sources:** For text or document submissions, the cached payload preserves the bridged publisher list (e.g. Wikipedia Knowledge Base, Encyclopaedia Britannica, or wire services) and elevated source credibility, ensuring subsequent queries receive identical, fully-hydrated verification dossiers.
+5. **Cache Invalidation & TTL:** Analyses older than 2 hours are automatically bypassed to allow fresh news crawling and updated fact-checking status. Administrative cache clearance is supported by querying and removing matching `content_hash` documents directly in MongoDB.
 
 ---
 

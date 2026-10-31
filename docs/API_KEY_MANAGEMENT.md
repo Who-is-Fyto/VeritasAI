@@ -24,17 +24,29 @@ API keys should never be stored in plain text in the database. If the database g
 
 ---
 
-## 3. The Dual Dependency Gate
+## 3. The Dual Dependency Gate & Public Guest Scans
 
-We wanted the core analysis endpoint (`POST /api/v1/analyse`) to accept BOTH standard logged-in users and automated script keys.
+We wanted our API architecture to handle three distinct access profiles:
+1. **Authenticated Users:** Logged-in journalists, researchers, and students using standard JWT Bearer sessions.
+2. **Automated Scripts & Developers:** Headless research crawlers and data pipelines supplying `X-Veritas-API-Key` headers.
+3. **Public Guest Visitors:** Open web visitors scanning an article or claim on the landing page without an active account.
 
-In `backend/app/routers/auth.py`, we wrote a custom FastAPI dependency called `get_user_or_api_key`:
-1.  **Check JWT:** First, it checks if a valid Bearer token is provided in the `Authorization` header. If it's valid, it returns the user.
-2.  **Check API Key:** If no JWT is found, it looks for the custom header `X-Veritas-API-Key`.
-3.  **Validate Hash:** It takes the incoming header, hashes it with SHA-256, and queries MongoDB for a matching document.
-4.  **Allow or Block:** If a match is found, it lets the analysis run. If both checks fail, it raises a `401 Unauthorized` block.
+In `backend/app/routers/auth.py`, we implemented two specialized FastAPI security dependencies:
 
-You can manage your API keys, view their creation dates, and revoke (delete) them instantly in the Profile dashboard!
+### Strict Authentication: `get_user_or_api_key`
+Used for protected user profile, history, API key generation, and administrative endpoints:
+1. **Check JWT:** First, checks for a valid Bearer token in the `Authorization` header. If valid, resolves the user session.
+2. **Check API Key:** If no JWT is present, checks for the custom `X-Veritas-API-Key` header.
+3. **Validate Hash:** Hashes the incoming key with SHA-256 and queries the `api_keys` collection. If active and matched, resolves the linked user.
+4. **Enforce Access:** If both credentials are missing or invalid, raises `401 Unauthorized`.
+
+### Optional Authentication: `get_optional_user_or_api_key`
+Used by `POST /api/v1/analyse` to provide an accessible public scanner:
+1. **Guest Permitted:** If neither JWT nor API key is passed, returns `None`, allowing the verification pipeline to execute seamlessly.
+2. **Quota & Audit Attribution:** If credentials are provided, resolves the user and associates the resulting report with their saved history and account tier limits.
+3. **Security Invariant:** If invalid, expired, or malformed credentials are provided, strictly blocks the request with `401 Unauthorized` to prevent spoofed sessions.
+
+You can manage your API keys, view their creation dates, and revoke them instantly in the Profile dashboard!
 
 ---
 

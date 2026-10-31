@@ -255,19 +255,28 @@ class CorroborationService:
                     seen_stems.add(st)
                     actor_tokens.append(tok)
 
-        # 3. Substantive content words (filtering out reporting fillers)
+        # 3. Substantive content words (filtering out reporting fillers and non-salient adjectives)
         reporting_fillers = {
             "according", "report", "reported", "reports", "state", "stated", "states",
             "claim", "claims", "claimed", "official", "officials", "government",
             "personnel", "active-duty", "statement", "announced", "spokesperson",
             "sources", "bystanders", "unverified", "population", "massive", "proved",
             "incident", "details", "following", "recent", "recently", "deployed",
-            "combat", "destroying", "scattering", "rapidly", "ultimately", "forced"
+            "combat", "destroying", "scattering", "rapidly", "ultimately", "forced",
+            "unexpected", "shocking", "breaking", "unbelievable", "incredible",
+            "alleged", "apparent", "peaceful", "secretly"
         }
         substantive = [
             w for w in all_words
             if w.lower() not in STOPWORDS and w.lower() not in reporting_fillers and _stem(w.lower()) not in seen_stems and not w.isdigit()
         ]
+
+        # Identify key action predicate
+        action_word = None
+        for w in all_words:
+            if any(w.lower().startswith(root) for root in ACTION_ROOTS):
+                action_word = w
+                break
 
         # If claim lacks actors (continuation statement), incorporate context terms
         if context_terms and (not actors or len(actor_tokens) < 2):
@@ -277,11 +286,13 @@ class CorroborationService:
                     actor_tokens.append(ct)
                     seen_stems.add(st)
 
-        # Build concise query: Year (if any) + Actor tokens + Substantive topic nouns
+        # Build concise query: Year (if any) + Actor tokens + Action word + Substantive topic nouns
         concise_tokens: list[str] = []
         if years:
             concise_tokens.append(years[0])
         concise_tokens.extend(actor_tokens[:2])
+        if action_word and action_word not in concise_tokens:
+            concise_tokens.append(action_word)
 
         # Prioritize key topic nouns (e.g., words ending with 's' or substantive terms)
         topic_nouns = [w for w in substantive if w.lower().endswith("s") or len(w) >= 4]
@@ -352,10 +363,22 @@ class CorroborationService:
             return res
 
         # Concurrently execute certified Fact-Check + News RSS + Organic Press + NewsAPI + Wikipedia
+        rss_queries = [concise_query]
+        all_words_list = re.findall(r"\b[a-zA-Z0-9\.\-%]{2,}\b", claim)
+        act_word = next((w for w in all_words_list if any(w.lower().startswith(r) for r in ACTION_ROOTS)), None)
+        if act_word and entity_query:
+            clean_ent = entity_query.replace('"', '')
+            if f'"{clean_ent}" {act_word}' not in rss_queries:
+                rss_queries.append(f'"{clean_ent}" {act_word}')
+            if f"{clean_ent} {act_word}" not in rss_queries:
+                rss_queries.append(f"{clean_ent} {act_word}")
+        if salient_query and salient_query not in rss_queries:
+            rss_queries.append(salient_query)
+
         fact_check_queries = [concise_query, salient_query]
         fact_check_task = self._query_google_fact_check(fact_check_queries, claim, client)
-        rss_task = self._query_google_news_rss(concise_query, claim, client)
-        ddg_task = self._query_duckduckgo(concise_query, claim, client)
+        rss_task = self._query_google_news_rss(rss_queries, claim, client)
+        ddg_task = self._query_duckduckgo([concise_query, salient_query], claim, client)
         news_task = self._query_news_api(salient_query, entity_query, claim, client)
         wiki_task = self._query_wikipedia(entity_query, salient_query, claim, client)
 
@@ -400,10 +423,6 @@ class CorroborationService:
             )
 
             # Stance & Refutation Detection
-            if any(rm in full_snippet for rm in REFUTATION_KEYWORDS):
-                refutation_sources.append(source_obj)
-            else:
-                corroborating_sources.append(source_obj)
             if any(rm in full_snippet for rm in REFUTATION_KEYWORDS):
                 refutation_sources.append(source_obj)
             else:
@@ -459,104 +478,122 @@ class CorroborationService:
         self._claim_cache[claim] = res
         return res
 
-    async def _query_google_news_rss(self, query: str, claim: str, client: httpx.AsyncClient) -> list[dict]:
+    async def _query_google_news_rss(self, queries: str | list[str], claim: str, client: httpx.AsyncClient) -> list[dict]:
         """Query Google News RSS feed for live global news coverage across accredited publishers."""
-        if not query:
+        if not queries:
             return []
-        try:
-            resp = await client.get(
-                "https://news.google.com/rss/search",
-                params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
-                timeout=3.0
-            )
-            if resp.status_code != 200:
-                return []
+        query_list = [queries] if isinstance(queries, str) else queries
+        seen_queries = set()
 
-            root = ET.fromstring(resp.text)
-            items = root.findall(".//item")
-            matches: list[dict] = []
-
-            for item in items[:6]:
-                raw_title = item.find("title").text if item.find("title") is not None else ""
-                url = item.find("link").text if item.find("link") is not None else ""
-                pub_elem = item.find("source")
-                publisher = pub_elem.text if pub_elem is not None else "News Wire"
-                pub_date = item.find("pubDate").text if item.find("pubDate") is not None else None
-
-                # Clean title: Google News RSS titles end with ' - Publisher'
-                clean_title = re.sub(r"\s+-\s+[^-]+$", "", raw_title).strip()
-                if not clean_title:
-                    clean_title = raw_title
-
-                if not self._is_claim_relevant(claim, clean_title, min_sim=0.18):
+        for query in query_list:
+            if not query or query in seen_queries:
+                continue
+            seen_queries.add(query)
+            try:
+                resp = await client.get(
+                    "https://news.google.com/rss/search",
+                    params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
+                    timeout=3.0
+                )
+                if resp.status_code != 200:
                     continue
 
-                sim = self._compute_overlap(claim, clean_title)
-                matches.append({
-                    "title": clean_title,
-                    "description": f"Published in {publisher} on {pub_date}" if pub_date else f"Reported by {publisher}",
-                    "url": url,
-                    "publisher": publisher,
-                    "similarity": round(max(sim * 100, 78.0), 1),
-                    "timestamp": pub_date
-                })
+                root = ET.fromstring(resp.text)
+                items = root.findall(".//item")
+                matches: list[dict] = []
 
-            return matches
-        except Exception as e:
-            logger.debug("Google News RSS query failed for '%s': %s", query, e)
-            return []
+                for item in items[:6]:
+                    raw_title = item.find("title").text if item.find("title") is not None else ""
+                    url = item.find("link").text if item.find("link") is not None else ""
+                    pub_elem = item.find("source")
+                    publisher = pub_elem.text if pub_elem is not None else "News Wire"
+                    pub_date = item.find("pubDate").text if item.find("pubDate") is not None else None
 
-    async def _query_duckduckgo(self, query: str, claim: str, client: httpx.AsyncClient) -> list[dict]:
+                    # Clean title: Google News RSS titles end with ' - Publisher'
+                    clean_title = re.sub(r"\s+-\s+[^-]+$", "", raw_title).strip()
+                    if not clean_title:
+                        clean_title = raw_title
+
+                    if not self._is_claim_relevant(claim, clean_title, min_sim=0.18):
+                        continue
+
+                    sim = self._compute_overlap(claim, clean_title)
+                    matches.append({
+                        "title": clean_title,
+                        "description": f"Published in {publisher} on {pub_date}" if pub_date else f"Reported by {publisher}",
+                        "url": url,
+                        "publisher": publisher,
+                        "similarity": round(max(sim * 100, 78.0), 1),
+                        "timestamp": pub_date
+                    })
+
+                if matches:
+                    return matches
+            except Exception as e:
+                logger.debug("Google News RSS query failed for '%s': %s", query, e)
+
+        return []
+
+    async def _query_duckduckgo(self, queries: str | list[str], claim: str, client: httpx.AsyncClient) -> list[dict]:
         """Query DuckDuckGo HTML search for organic press corroboration."""
-        if not query:
+        if not queries:
             return []
-        try:
-            browser_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
-            resp = await client.post(
-                "https://html.duckduckgo.com/html/",
-                data={"q": query},
-                headers=browser_headers,
-                timeout=3.5
-            )
-            if resp.status_code != 200:
-                return []
+        query_list = [queries] if isinstance(queries, str) else queries
+        seen_queries = set()
 
-            soup = BeautifulSoup(resp.text, "html.parser")
-            results = soup.select(".result")
-            matches: list[dict] = []
-
-            for res in results[:5]:
-                title_elem = res.select_one(".result__title")
-                snippet_elem = res.select_one(".result__snippet")
-                url_elem = res.select_one(".result__url")
-
-                title = title_elem.get_text(strip=True) if title_elem else ""
-                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                url_text = url_elem.get_text(strip=True) if url_elem else ""
-
-                if not title:
+        for query in query_list:
+            if not query or query in seen_queries:
+                continue
+            seen_queries.add(query)
+            try:
+                browser_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+                resp = await client.post(
+                    "https://html.duckduckgo.com/html/",
+                    data={"q": query},
+                    headers=browser_headers,
+                    timeout=3.5
+                )
+                if resp.status_code != 200:
                     continue
 
-                combined_candidate = f"{title} {snippet}"
-                if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.16):
-                    continue
+                soup = BeautifulSoup(resp.text, "html.parser")
+                results = soup.select(".result")
+                matches: list[dict] = []
 
-                # Deduce publisher name from domain
-                publisher = url_text.split("/")[0].replace("www.", "") if url_text else "Press Archive"
+                for res in results[:5]:
+                    title_elem = res.select_one(".result__title")
+                    snippet_elem = res.select_one(".result__snippet")
+                    url_elem = res.select_one(".result__url")
 
-                sim = self._compute_overlap(claim, combined_candidate)
-                matches.append({
-                    "title": title,
-                    "description": snippet,
-                    "url": f"https://{url_text}" if not url_text.startswith("http") else url_text,
-                    "publisher": publisher.capitalize(),
-                    "similarity": round(max(sim * 100, 75.0), 1)
-                })
+                    title = title_elem.get_text(strip=True) if title_elem else ""
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    url_text = url_elem.get_text(strip=True) if url_elem else ""
 
-            return matches
-        except Exception as e:
-            logger.debug("DuckDuckGo search failed for '%s': %s", query, e)
-            return []
+                    if not title:
+                        continue
+
+                    combined_candidate = f"{title} {snippet}"
+                    if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.16):
+                        continue
+
+                    # Deduce publisher name from domain
+                    publisher = url_text.split("/")[0].replace("www.", "") if url_text else "Press Archive"
+
+                    sim = self._compute_overlap(claim, combined_candidate)
+                    matches.append({
+                        "title": title,
+                        "description": snippet,
+                        "url": f"https://{url_text}" if not url_text.startswith("http") else url_text,
+                        "publisher": publisher.capitalize(),
+                        "similarity": round(max(sim * 100, 75.0), 1)
+                    })
+
+                if matches:
+                    return matches
+            except Exception as e:
+                logger.debug("DuckDuckGo search failed for '%s': %s", query, e)
+
+        return []
 
     def _is_claim_relevant(self, claim: str, candidate_text: str, min_sim: float = 0.20) -> bool:
         """

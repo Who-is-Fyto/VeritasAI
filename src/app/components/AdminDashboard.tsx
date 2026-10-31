@@ -45,8 +45,13 @@ import { useAuth } from "../../context/AuthContext";
 import type { AdminUser, DatabaseTelemetry, AuditLog, BackupMetadata } from "../../types/admin";
 
 export function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, tier } = useAuth();
   const navigate = useNavigate();
+
+  const isSuperAdmin =
+    tier === "superadmin" ||
+    user?.role === "superadmin" ||
+    user?.tier === "superadmin";
 
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<"users" | "telemetry" | "backups" | "audit" | "trainer">("users");
@@ -348,9 +353,11 @@ export function AdminDashboard() {
                 </span>
                 <div>
                   <h1 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-                    Super Administrator Console
-                    <span className="px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase bg-emerald-600 text-white">
-                      Superadmin Tier
+                    {isSuperAdmin ? "Super Administrator Console" : "Operational Admin Console"}
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase text-white ${
+                      isSuperAdmin ? "bg-emerald-600" : "bg-indigo-600"
+                    }`}>
+                      {isSuperAdmin ? "Superadmin Tier" : "Admin Tier"}
                     </span>
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-500 font-medium">
@@ -376,14 +383,16 @@ export function AdminDashboard() {
                 Refresh Data
               </button>
 
-              <button
-                onClick={handleTriggerTraining}
-                disabled={trainTriggering}
-                className="px-4 py-2 bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                <Brain className="w-3.5 h-3.5" />
-                {trainTriggering ? "Dispatched..." : "Trigger Model Retrain"}
-              </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={handleTriggerTraining}
+                  disabled={trainTriggering}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Brain className="w-3.5 h-3.5" />
+                  {trainTriggering ? "Dispatched..." : "Trigger Model Retrain"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -619,14 +628,22 @@ export function AdminDashboard() {
                     users.map((u) => {
                       const isSelf = u.id === user?.id || u.email === user?.email;
                       const isSuspended = u.is_suspended;
+                      const isTargetAdmin =
+                        u.tier === "superadmin" ||
+                        u.tier === "admin" ||
+                        (u.role || "").toLowerCase() === "superadmin" ||
+                        (u.role || "").toLowerCase() === "admin";
+                      const canModifyThisUser = isSuperAdmin || (!isTargetAdmin && !isSelf);
 
                       const tierBadgeStyle =
                         u.tier === "superadmin"
                           ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : u.tier === "admin"
+                          ? "bg-indigo-100 text-indigo-800 border-indigo-300"
                           : u.tier === "pro"
                           ? "bg-blue-100 text-blue-800 border-blue-300"
                           : u.tier === "academic"
-                          ? "bg-indigo-100 text-indigo-800 border-indigo-300"
+                          ? "bg-purple-100 text-purple-800 border-purple-300"
                           : "bg-slate-100 text-slate-700 border-slate-200";
 
                       return (
@@ -670,13 +687,14 @@ export function AdminDashboard() {
                               <select
                                 value={u.tier}
                                 onChange={(e) => handleUpdateTier(u.id, e.target.value)}
-                                disabled={actionLoading}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 ${tierBadgeStyle}`}
+                                disabled={actionLoading || !canModifyThisUser}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed ${tierBadgeStyle}`}
                               >
                                 <option value="free">Free Tier</option>
                                 <option value="academic">Academic Seat</option>
                                 <option value="pro">Pro Journalist</option>
-                                <option value="superadmin">Super Admin</option>
+                                {(isSuperAdmin || u.tier === "admin") && <option value="admin">Administrator</option>}
+                                {(isSuperAdmin || u.tier === "superadmin") && <option value="superadmin">Super Admin</option>}
                               </select>
                             </div>
                           </td>
@@ -710,10 +728,12 @@ export function AdminDashboard() {
                               {/* Suspend / Reinstate Button */}
                               <button
                                 onClick={() => setSuspensionModalUser(u)}
-                                disabled={isSelf || actionLoading}
+                                disabled={isSelf || !canModifyThisUser || actionLoading}
                                 title={
                                   isSelf
                                     ? "Cannot suspend your own account"
+                                    : !canModifyThisUser
+                                    ? "Administrative accounts cannot be modified by operational admins"
                                     : isSuspended
                                     ? "Reinstate account"
                                     : "Suspend account"
@@ -730,8 +750,14 @@ export function AdminDashboard() {
                               {/* Delete Button */}
                               <button
                                 onClick={() => setDeleteModalUser(u)}
-                                disabled={isSelf || actionLoading}
-                                title={isSelf ? "Cannot delete your own account" : "Delete user"}
+                                disabled={isSelf || !isSuperAdmin || actionLoading}
+                                title={
+                                  isSelf
+                                    ? "Cannot delete your own account"
+                                    : !isSuperAdmin
+                                    ? "Super Administrator privileges required to delete accounts"
+                                    : "Delete user"
+                                }
                                 className="p-1.5 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -868,14 +894,16 @@ export function AdminDashboard() {
                     <span>Footprint: <strong className="text-slate-900">{backupsTotalSize}</strong></span>
                   </div>
 
-                  <button
-                    onClick={handleCreateBackup}
-                    disabled={backupCreating}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${backupCreating ? "animate-spin" : ""}`} />
-                    <span>{backupCreating ? "Creating Snapshot..." : "Create System Backup"}</span>
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      onClick={handleCreateBackup}
+                      disabled={backupCreating}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${backupCreating ? "animate-spin" : ""}`} />
+                      <span>{backupCreating ? "Creating Snapshot..." : "Create System Backup"}</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -889,6 +917,18 @@ export function AdminDashboard() {
                   </p>
                 </div>
               </div>
+
+              {!isSuperAdmin && (
+                <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-200/70 flex items-start gap-3">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5 text-xs">
+                    <p className="font-bold text-indigo-950">Operational Admin Notice</p>
+                    <p className="text-indigo-800 leading-relaxed">
+                      Snapshot creation, archive downloads, and disaster recovery restorations require Super Administrator privileges.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Backups Ledger Table */}
@@ -987,33 +1027,39 @@ export function AdminDashboard() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => handleDownloadBackup(b.filename)}
-                                disabled={downloadingFilename === b.filename}
-                                title="Download compressed zip archive"
-                                className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Download className={`w-4 h-4 ${downloadingFilename === b.filename ? "animate-bounce" : ""}`} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setRestoreModalBackup(b);
-                                  setRestoreConfirmation("");
-                                }}
-                                title="Restore database from this snapshot"
-                                className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeleteModalBackup(b)}
-                                title="Delete snapshot archive"
-                                className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {isSuperAdmin ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleDownloadBackup(b.filename)}
+                                  disabled={downloadingFilename === b.filename}
+                                  title="Download compressed zip archive"
+                                  className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Download className={`w-4 h-4 ${downloadingFilename === b.filename ? "animate-bounce" : ""}`} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setRestoreModalBackup(b);
+                                    setRestoreConfirmation("");
+                                  }}
+                                  title="Restore database from this snapshot"
+                                  className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteModalBackup(b)}
+                                  title="Delete snapshot archive"
+                                  className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-slate-400 italic">
+                                Superadmin Only
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1106,14 +1152,20 @@ export function AdminDashboard() {
                 </p>
               </div>
 
-              <button
-                onClick={handleTriggerTraining}
-                disabled={trainTriggering}
-                className="px-4 py-2 bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 self-start sm:self-center"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${trainTriggering ? "animate-spin" : ""}`} />
-                {trainTriggering ? "Training Dispatched..." : "Run Retraining Cycle"}
-              </button>
+              {isSuperAdmin ? (
+                <button
+                  onClick={handleTriggerTraining}
+                  disabled={trainTriggering}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 self-start sm:self-center"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${trainTriggering ? "animate-spin" : ""}`} />
+                  {trainTriggering ? "Training Dispatched..." : "Run Retraining Cycle"}
+                </button>
+              ) : (
+                <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500 text-xs font-semibold self-start sm:self-center">
+                  Superadmin Retrain Restricted
+                </span>
+              )}
             </div>
 
             <div className="grid sm:grid-cols-3 gap-4">

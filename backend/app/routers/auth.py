@@ -40,8 +40,10 @@ def build_user_response(user_doc: dict) -> UserResponse:
     explicit_tier = user_doc.get("tier")
     if explicit_tier:
         tier = explicit_tier.lower()
-    elif role.lower() in {"superadmin", "admin"}:
+    elif user_doc.get("is_superadmin") or role.lower() == "superadmin":
         tier = "superadmin"
+    elif user_doc.get("is_admin") or role.lower() == "admin":
+        tier = "admin"
     elif account_type == "academic":
         tier = "academic"
     elif account_type == "enterprise":
@@ -49,7 +51,7 @@ def build_user_response(user_doc: dict) -> UserResponse:
     else:
         tier = "free"
 
-    daily_limit = 5 if tier == "free" else 999999
+    daily_limit = 5 if tier == "free" else (100 if tier == "academic" else 999999)
 
     return UserResponse(
         id=user_doc["_id"],
@@ -225,15 +227,24 @@ async def register(
         joined_time = datetime.now(timezone.utc)
 
         aff = resolve_user_affiliation(clean_email)
+
+        # Public self-registration strictly cannot claim administrative roles
+        requested_role = (body.role or "").strip()
+        if requested_role.lower() in {"superadmin", "admin", "administrator"}:
+            requested_role = aff["role"]
+
         user_doc = {
             "_id": user_id,
             "email": clean_email,
             "password": hashed_password,
             "name": body.name.strip(),
             "institution": body.institution.strip() if body.institution else aff["institution"],
-            "role": body.role.strip() if body.role else aff["role"],
+            "role": requested_role if requested_role else aff["role"],
             "student_id": body.student_id.strip() if body.student_id else aff["student_id"],
             "account_type": aff["account_type"],
+            "tier": "free",
+            "is_superadmin": False,
+            "is_admin": False,
             "joined_at": joined_time
         }
         await db["users"].insert_one(user_doc)
@@ -358,6 +369,14 @@ async def update_tier(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> UserResponse:
+    current_tier_lower = (current_user.tier or "").lower()
+    current_role_lower = (current_user.role or "").lower()
+    if current_tier_lower in {"admin", "superadmin"} or current_role_lower in {"admin", "superadmin"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative accounts cannot be modified via self-service commercial subscriptions."
+        )
+
     target_tier = body.tier.lower()
     account_type = "academic" if target_tier == "academic" else "enterprise" if target_tier == "pro" else "base"
 

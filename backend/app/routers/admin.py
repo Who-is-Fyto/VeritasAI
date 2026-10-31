@@ -41,33 +41,72 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
-# ── RBAC Security Dependency: Require Super Administrator ────────────────────
-async def require_superadmin(
+# ── RBAC Security Dependencies ───────────────────────────────────────────────
+async def require_admin(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> UserResponse:
     """
-    Enforces strict role-based access control.
-    Only accounts designated as superadmin or admin can access administrative endpoints.
+    Enforces Role-Based Access Control (RBAC) for Operational Administrators and Super Administrators.
+    Grants access to user listing, moderation, system metrics, and audit logs.
     """
-    is_admin = (
-        current_user.tier.lower() == "superadmin"
-        or current_user.role.lower() in {"superadmin", "admin"}
-        or "superadmin@" in current_user.email.lower()
-        or "admin@veritas.ai" in current_user.email.lower()
-    )
+    is_admin = False
+    tier_lower = (current_user.tier or "").lower()
+    role_lower = (current_user.role or "").lower()
+    clean_email = (current_user.email or "").lower().strip()
 
-    if not is_admin:
+    if tier_lower in {"admin", "superadmin"} or role_lower in {"admin", "superadmin"}:
+        is_admin = True
+    elif clean_email in {"superadmin@veritas.ai", "admin@veritas.ai"}:
+        is_admin = True
+    else:
         doc = await db["users"].find_one({"_id": current_user.id})
         if doc and (
             doc.get("is_superadmin")
+            or doc.get("is_admin")
             or (doc.get("role") or "").lower() in {"superadmin", "admin"}
-            or (doc.get("tier") or "").lower() == "superadmin"
+            or (doc.get("tier") or "").lower() in {"superadmin", "admin"}
         ):
             is_admin = True
 
     if not is_admin:
         logger.warning("Unauthorized access attempt to admin endpoint by user %s (%s)", current_user.email, current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Super Administrator privileges are required to access this endpoint."
+        )
+
+    return current_user
+
+
+async def require_superadmin(
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> UserResponse:
+    """
+    Enforces strict Role-Based Access Control exclusively for Super Administrators.
+    Required for destructive operations (database restore), model training triggers, and admin promotions.
+    """
+    is_super = False
+    tier_lower = (current_user.tier or "").lower()
+    role_lower = (current_user.role or "").lower()
+    clean_email = (current_user.email or "").lower().strip()
+
+    if tier_lower == "superadmin" or role_lower == "superadmin":
+        is_super = True
+    elif clean_email in {"superadmin@veritas.ai", "admin@veritas.ai"}:
+        is_super = True
+    else:
+        doc = await db["users"].find_one({"_id": current_user.id})
+        if doc and (
+            doc.get("is_superadmin")
+            or (doc.get("role") or "").lower() == "superadmin"
+            or (doc.get("tier") or "").lower() == "superadmin"
+        ):
+            is_super = True
+
+    if not is_super:
+        logger.warning("Unauthorized superadmin action attempt by user %s (%s)", current_user.email, current_user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Super Administrator privileges are required to access this endpoint."
@@ -157,7 +196,7 @@ async def list_users(
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by active or suspended"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    current_admin: UserResponse = Depends(require_superadmin),
+    current_admin: UserResponse = Depends(require_admin),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> AdminUserListResponse:
     query: dict = {}
@@ -189,8 +228,8 @@ async def list_users(
         uid = str(doc.get("_id"))
         verifications_count = await db["results"].count_documents({"user_id": uid})
 
-        user_tier = doc.get("tier") or ("superadmin" if (doc.get("role") or "").lower() == "superadmin" else "free")
-        daily_limit = 5 if user_tier == "free" else 999999
+        user_tier = doc.get("tier") or ("superadmin" if (doc.get("role") or "").lower() == "superadmin" else ("admin" if (doc.get("role") or "").lower() == "admin" else "free"))
+        daily_limit = 5 if user_tier == "free" else (100 if user_tier == "academic" else 999999)
 
         users_list.append(AdminUserListItem(
             id=uid,
@@ -229,26 +268,62 @@ async def update_user_tier(
     user_id: str,
     body: AdminUpdateTierRequest,
     req: Request,
-    current_admin: UserResponse = Depends(require_superadmin),
+    current_admin: UserResponse = Depends(require_admin),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> AdminUserListItem:
     target_tier = body.tier.lower().strip()
-    valid_tiers = {"free", "pro", "academic", "superadmin"}
+    valid_tiers = {"free", "pro", "academic", "admin", "superadmin"}
     if target_tier not in valid_tiers:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid tier '{target_tier}'. Allowed tiers: {', '.join(valid_tiers)}"
+            detail=f"Invalid tier '{target_tier}'. Allowed tiers: {', '.join(sorted(valid_tiers))}"
         )
 
     user_doc = await db["users"].find_one({"_id": user_id})
     if not user_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
 
+    caller_is_super = (
+        (current_admin.tier or "").lower() == "superadmin"
+        or (current_admin.role or "").lower() == "superadmin"
+        or current_admin.email.lower().strip() in {"superadmin@veritas.ai", "admin@veritas.ai"}
+    )
+
+    # 1. Elevating an account to Admin or Superadmin requires Superadmin authority
+    if target_tier in {"admin", "superadmin"} and not caller_is_super:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Only Super Administrators can elevate accounts to Admin or Super Admin."
+        )
+
+    # 2. Modifying or demoting an existing Admin or Superadmin requires Superadmin authority
+    target_current_tier = (user_doc.get("tier") or "").lower()
+    target_current_role = (user_doc.get("role") or "").lower()
+    if (target_current_tier in {"admin", "superadmin"} or target_current_role in {"admin", "superadmin"} or user_doc.get("is_superadmin")):
+        if not caller_is_super:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Operational Administrators cannot modify or demote other administrative accounts."
+            )
+
     old_tier = user_doc.get("tier", "free")
     update_data = {"tier": target_tier}
     if target_tier == "superadmin":
         update_data["role"] = "superadmin"
         update_data["is_superadmin"] = True
+        update_data["is_admin"] = True
+        update_data["account_type"] = "enterprise"
+    elif target_tier == "admin":
+        update_data["role"] = "admin"
+        update_data["is_superadmin"] = False
+        update_data["is_admin"] = True
+        update_data["account_type"] = "enterprise"
+    else:
+        update_data["is_superadmin"] = False
+        update_data["is_admin"] = False
+        if (user_doc.get("role") or "").lower() in {"superadmin", "admin"}:
+            update_data["role"] = "Base User"
+        update_data["account_type"] = "academic" if target_tier == "academic" else ("enterprise" if target_tier == "pro" else "base")
 
     await db["users"].update_one({"_id": user_id}, {"$set": update_data})
     updated_doc = await db["users"].find_one({"_id": user_id})
@@ -279,7 +354,7 @@ async def update_user_tier(
         tier=target_tier,
         is_suspended=bool(updated_doc.get("is_suspended", False)),
         suspension_reason=updated_doc.get("suspension_reason"),
-        daily_limit=5 if target_tier == "free" else 999999,
+        daily_limit=5 if target_tier == "free" else (100 if target_tier == "academic" else 999999),
         daily_used=updated_doc.get("daily_used", 0),
         total_verifications=verifications_count,
         last_active=updated_doc.get("last_active") or updated_doc.get("joined_at")
@@ -295,7 +370,7 @@ async def update_user_status(
     user_id: str,
     body: AdminSuspendUserRequest,
     req: Request,
-    current_admin: UserResponse = Depends(require_superadmin),
+    current_admin: UserResponse = Depends(require_admin),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> AdminUserListItem:
     if user_id == current_admin.id:
@@ -307,6 +382,22 @@ async def update_user_status(
     user_doc = await db["users"].find_one({"_id": user_id})
     if not user_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
+
+    caller_is_super = (
+        (current_admin.tier or "").lower() == "superadmin"
+        or (current_admin.role or "").lower() == "superadmin"
+        or current_admin.email.lower().strip() in {"superadmin@veritas.ai", "admin@veritas.ai"}
+    )
+
+    # Protect administrative accounts from operational admin suspension
+    target_current_tier = (user_doc.get("tier") or "").lower()
+    target_current_role = (user_doc.get("role") or "").lower()
+    if (target_current_tier in {"admin", "superadmin"} or target_current_role in {"admin", "superadmin"} or user_doc.get("is_superadmin")):
+        if not caller_is_super:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Operational Administrators cannot suspend other administrative accounts."
+            )
 
     await db["users"].update_one(
         {"_id": user_id},
@@ -400,7 +491,7 @@ async def delete_user(
     summary="Retrieve real-time database storage metrics, collection counts, and query latency"
 )
 async def get_db_telemetry(
-    current_admin: UserResponse = Depends(require_superadmin),
+    current_admin: UserResponse = Depends(require_admin),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> DatabaseTelemetryResponse:
     # 1. Latency benchmark via MongoDB ping
@@ -481,7 +572,7 @@ async def get_db_telemetry(
 async def get_audit_logs(
     action: Optional[str] = Query(None, description="Filter by action type"),
     limit: int = Query(50, ge=1, le=200),
-    current_admin: UserResponse = Depends(require_superadmin),
+    current_admin: UserResponse = Depends(require_admin),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> AuditLogsResponse:
     query: dict = {}
@@ -516,7 +607,7 @@ async def get_audit_logs(
     "/train/status",
     summary="Get current self-training loop execution status"
 )
-async def get_train_status(current_admin: UserResponse = Depends(require_superadmin)):
+async def get_train_status(current_admin: UserResponse = Depends(require_admin)):
     return await trainer_service.get_status()
 
 
@@ -583,7 +674,7 @@ async def create_backup(
     summary="List historical backup snapshots and storage footprint"
 )
 async def list_backups(
-    current_admin: UserResponse = Depends(require_superadmin),
+    current_admin: UserResponse = Depends(require_admin),
 ) -> BackupListResponse:
     return await backup_service.list_backups()
 

@@ -12,7 +12,7 @@ export interface AdminUser {
   institution?: string;
   student_id?: string;
   account_type: string;
-  tier: "free" | "pro" | "academic" | "superadmin";
+  tier: "free" | "pro" | "academic" | "admin" | "superadmin";
   is_suspended: boolean;
   suspension_reason?: string;
   daily_limit: number;

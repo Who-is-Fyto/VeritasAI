@@ -247,6 +247,8 @@ export function Profile() {
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border backdrop-blur-md shadow-sm ${
                     tier === "superadmin"
                       ? "bg-emerald-500/30 text-emerald-100 border-emerald-300/40"
+                      : tier === "admin"
+                      ? "bg-indigo-500/30 text-indigo-100 border-indigo-300/40"
                       : tier === "academic"
                       ? "bg-indigo-500/30 text-indigo-100 border-indigo-300/40"
                       : tier === "pro"
@@ -255,12 +257,21 @@ export function Profile() {
                   }`}>
                     {tierConfig.badgeLabel}
                   </span>
-                  <button
-                    onClick={() => setPricingOpen(true)}
-                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-colors cursor-pointer"
-                  >
-                    Change Plan
-                  </button>
+                  {tier === "superadmin" || tier === "admin" ? (
+                    <Link
+                      to="/admin"
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-100 border border-emerald-300/40 transition-colors"
+                    >
+                      Admin Console
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => setPricingOpen(true)}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-colors cursor-pointer"
+                    >
+                      Change Plan
+                    </button>
+                  )}
                 </div>
                 <p className="text-blue-100 text-sm mt-1 flex items-center gap-2 flex-wrap">
                   <span>{user.role}</span>

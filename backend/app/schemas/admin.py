@@ -4,7 +4,7 @@ Admin & Super Admin Schemas
 Schemas for RBAC user management, database telemetry metrics, and system audit logs.
 """
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 
 
@@ -35,7 +35,16 @@ class AdminUserListResponse(BaseModel):
 
 
 class AdminUpdateTierRequest(BaseModel):
-    tier: str = Field(..., description="Target tier: free, pro, academic, or superadmin")
+    tier: str = Field(..., description="Target tier: free, pro, academic, admin, or superadmin")
+
+    @field_validator("tier")
+    @classmethod
+    def validate_tier_name(cls, v: str) -> str:
+        clean = v.strip().lower()
+        allowed = {"free", "pro", "academic", "admin", "superadmin"}
+        if clean not in allowed:
+            raise ValueError(f"Invalid tier '{clean}'. Allowed tiers: {sorted(list(allowed))}")
+        return clean
 
 
 class AdminSuspendUserRequest(BaseModel):

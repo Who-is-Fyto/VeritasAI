@@ -97,4 +97,65 @@ This guarantees timezone-safe ISO 8601 timestamps and ensures clean, warning-fre
 
 ---
 
+## 5. Two-Tier Role-Based Access Control (PoLP RBAC) & Administrative Lockout Prevention
+
+### The Problem:
+1. **Unchecked Self-Service Downgrade:** Previously, when an administrative user opened the consumer Pricing Modal and clicked a commercial subscription plan (Free or Pro), the client sent `PUT /api/v1/auth/tier`. The backend unconditionally updated the user's `tier` field in MongoDB to `"free"` or `"pro"`, stripping their administrative privileges and locking them out of the `/admin` portal.
+2. **Registration Privilege Escalation:** The public registration endpoint (`POST /api/v1/auth/register`) accepted arbitrary `role` parameters from the request payload. If a user supplied `role: "admin"` or `role: "superadmin"`, downstream response builders and authorization heuristics could grant administrative status. Furthermore, naive domain and substring matching (`"admin" in email`) introduced security vulnerabilities.
+3. **Monolithic Admin Model:** All administrative actions were bundled under a single monolithic superadmin tier, violating the Principle of Least Privilege (PoLP) and preventing the delegation of day-to-day moderation and telemetry oversight to operational staff.
+
+### The Solution:
+
+#### 1. PoLP Two-Tier Authorization Model (`require_admin` vs `require_superadmin`):
+We separated administrative responsibilities into two distinct security tiers:
+- **Operational Administrator (`admin`):** Granted access via `require_admin` to:
+  - User listing, filtering, and search.
+  - Commercial user tier management (`free`, `pro`, `academic`).
+  - Account moderation (suspending/reinstating standard accounts).
+  - Database telemetry and performance latency metrics.
+  - Immutable security audit log inspection.
+  - Active learning model status and loss metrics.
+- **Super Administrator (`superadmin`):** Enforced via `require_superadmin` for root operations:
+  - Elevating users to `admin` or `superadmin`.
+  - Demoting or modifying other administrators.
+  - Permanent user deletion.
+  - Point-in-time snapshot creation and archive downloads.
+  - Destructive database restoration operations.
+  - Dispatching active learning model retraining cycles.
+
+#### 2. Registration Role Sanitization:
+In `backend/app/routers/auth.py`, `register` strips any self-assigned administrative role:
+```python
+user_role = aff["role"]
+if user.role and user.role.lower() not in {"superadmin", "admin", "administrator"}:
+    user_role = user.role.strip()
+
+user_dict = {
+    # ...
+    "role": user_role,
+    "tier": "free",
+    "is_superadmin": False,
+    "is_admin": False,
+}
+```
+
+#### 3. Administrative Subscription Lockout Prevention:
+In `backend/app/routers/auth.py`, `update_tier` (`PUT /api/v1/auth/tier`) enforces an immediate `403 Forbidden` guard against any administrative account:
+```python
+is_admin_user = (
+    current_user.tier in {"superadmin", "admin"}
+    or (current_user.role or "").lower() in {"superadmin", "admin"}
+    or current_user.email.lower() in {"superadmin@veritas.ai", "admin@veritas.ai"}
+)
+if is_admin_user:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Administrative accounts cannot be modified via self-service commercial subscriptions."
+    )
+```
+
+In the frontend, `PricingModal.tsx` detects administrative status, displays a protective warning banner, and disables plan upgrade actions. Additionally, `Header.tsx` and `Profile.tsx` route administrative users directly to `/admin` instead of consumer billing options.
+
+---
+
 *BSc IT Dissertation Notes — Michael Mazhambe*

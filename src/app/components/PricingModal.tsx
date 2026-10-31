@@ -27,9 +27,10 @@ export function PricingModal({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const normalizedCurrentTier = (currentTier || 'free').toLowerCase();
+  const isPrivilegedAdmin = normalizedCurrentTier === 'admin' || normalizedCurrentTier === 'superadmin';
 
   const handleTierClick = async (tierId: AccountTier) => {
-    if (tierId === normalizedCurrentTier) return;
+    if (isPrivilegedAdmin || tierId === normalizedCurrentTier) return;
     setUpgradingTo(tierId);
     try {
       if (onSelectTier) {
@@ -141,6 +142,15 @@ export function PricingModal({
           </div>
         )}
 
+        {isPrivilegedAdmin && (
+          <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs flex items-center gap-3 font-medium">
+            <ShieldCheck className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+            <span>
+              You are signed in with an Administrative Account. Consumer subscription modifications are restricted for administrators. Manage accounts and permissions via the Admin Console.
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {tiers.map((tier) => {
             const Icon = tier.icon;
@@ -183,10 +193,10 @@ export function PricingModal({
                   className={`w-full mb-6 text-xs font-semibold py-2.5 rounded-xl cursor-pointer ${
                     tier.highlighted ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' : ''
                   }`}
-                  disabled={tier.isCurrent || isTarget}
+                  disabled={isPrivilegedAdmin || tier.isCurrent || isTarget}
                   onClick={() => handleTierClick(tier.id)}
                 >
-                  {isTarget ? 'Updating Plan...' : tier.buttonText}
+                  {isPrivilegedAdmin ? 'Managed via Console' : isTarget ? 'Updating Plan...' : tier.buttonText}
                 </Button>
 
                 <div className="space-y-2.5 text-xs text-slate-700 flex-1">

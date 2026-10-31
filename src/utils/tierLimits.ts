@@ -8,7 +8,7 @@
  * 4. Super Administrator: Full system governance, telemetry, and in-UI backup/restore.
  */
 
-export type AccountTier = "free" | "pro" | "academic" | "superadmin";
+export type AccountTier = "free" | "pro" | "academic" | "admin" | "superadmin";
 
 export interface TierConfig {
   id: AccountTier;
@@ -100,6 +100,30 @@ export const TIER_CONFIGS: Record<AccountTier, TierConfig> = {
       "Research methodology and weights export",
     ],
   },
+  admin: {
+    id: "admin",
+    name: "System Administrator",
+    badgeLabel: "Admin",
+    badgeClass: "bg-indigo-50 text-indigo-800 border-indigo-300 ring-1 ring-indigo-500/30",
+    price: "Operational",
+    period: "system role",
+    dailyLimit: Infinity,
+    allowsPdfExport: true,
+    allowsDeepCorroboration: true,
+    allowsModelRetraining: false,
+    allowsDeveloperApiKeys: true,
+    allowsPriorityQueue: true,
+    allowsTeamWorkspaces: true,
+    description: "Operational management: customer account tiers, user moderation, telemetry, and audit logs.",
+    features: [
+      "User moderation and account status controls",
+      "Customer tier elevation and quota management",
+      "Real-time database health and query latency telemetry",
+      "Comprehensive system audit logs review",
+      "Unlimited daily credibility verifications",
+      "Exportable PDF Audit Certificates",
+    ],
+  },
   superadmin: {
     id: "superadmin",
     name: "Super Administrator",
@@ -137,23 +161,24 @@ export function resolveTier(user?: {
 } | null): AccountTier {
   if (!user) return "free";
 
-  // Check role for superadmin
+  // Check explicit tier property first
+  const explicitTier = (user.tier || "").toLowerCase();
+  if (explicitTier === "superadmin") return "superadmin";
+  if (explicitTier === "admin") return "admin";
+  if (explicitTier === "pro" || explicitTier === "paid") return "pro";
+  if (explicitTier === "academic") return "academic";
+  if (explicitTier === "free") return "free";
+
+  // Check role
   const roleLower = (user.role || "").toLowerCase();
-  const emailLower = (user.email || "").toLowerCase();
-  if (
-    roleLower === "superadmin" ||
-    roleLower === "admin" ||
-    emailLower.startsWith("admin@") ||
-    emailLower.includes("superadmin")
-  ) {
+  if (roleLower === "superadmin") return "superadmin";
+  if (roleLower === "admin") return "admin";
+
+  // Canonical admin seed accounts
+  const emailLower = (user.email || "").toLowerCase().trim();
+  if (emailLower === "superadmin@veritas.ai" || emailLower === "admin@veritas.ai") {
     return "superadmin";
   }
-
-  // Check explicit tier property
-  const explicitTier = (user.tier || "").toLowerCase();
-  if (explicitTier === "pro" || explicitTier === "paid") return "pro";
-  if (explicitTier === "academic" || explicitTier === "enterprise") return "academic";
-  if (explicitTier === "superadmin") return "superadmin";
 
   // Check legacy account_type
   const accType = (user.account_type || "").toLowerCase();

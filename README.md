@@ -569,6 +569,9 @@ Cross-references claims across Google Fact Check Tools API (certified fact-check
 ### 7. Comprehensive Source Registry & Anti-Spoofing
 Registry of 100+ global, South African, and African publishers, certified fact-checkers, and questionable domains. Enforces journalistic attribution framing to prevent source authority spoofing via incidental name-dropping.
 
+### 8. Two-Tier Role-Based Access Control (PoLP RBAC) & Disaster Recovery
+Implements strict Principle of Least Privilege role separation distinguishing Operational Administrators (`admin`) from Super Administrators (`superadmin`). Operational admins manage commercial user tiers, perform account moderation, and inspect telemetry and audit logs, while root actions (destructive database snapshot restorations, active learning model retraining triggers, and administrator promotion/demotion) are strictly gated under `require_superadmin`. Administrative accounts are safeguarded with lockout prevention against commercial self-service subscription modifications.
+
 ---
 
 ## Technical Documentation

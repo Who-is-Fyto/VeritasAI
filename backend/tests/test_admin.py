@@ -109,6 +109,18 @@ class MockDatabase:
                 "joined_at": datetime.now(timezone.utc),
             },
             {
+                "_id": "op-admin-1",
+                "email": "moderator@veritas.ai",
+                "name": "Operational Admin",
+                "role": "admin",
+                "tier": "admin",
+                "account_type": "enterprise",
+                "is_superadmin": False,
+                "is_admin": True,
+                "is_suspended": False,
+                "joined_at": datetime.now(timezone.utc),
+            },
+            {
                 "_id": "user-2",
                 "email": "student@richfield.ac.za",
                 "name": "Student User",
@@ -283,4 +295,65 @@ async def test_admin_backup_lifecycle():
         delete_res = await client.delete(f"/api/v1/admin/backups/{filename}", headers=headers)
         assert delete_res.status_code == 200
         assert delete_res.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_operational_admin_permissions_and_restrictions():
+    """Verify operational admin can manage users but cannot elevate to admin or access backup actions."""
+    op_token = create_access_token("op-admin-1")
+    headers = {"Authorization": f"Bearer {op_token}"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Can view users
+        list_res = await client.get("/api/v1/admin/users", headers=headers)
+        assert list_res.status_code == 200
+
+        # 2. Can upgrade a customer to Pro
+        pro_res = await client.patch("/api/v1/admin/users/user-2/tier", json={"tier": "pro"}, headers=headers)
+        assert pro_res.status_code == 200
+        assert pro_res.json()["tier"] == "pro"
+
+        # 3. CANNOT elevate a user to admin or superadmin
+        elevate_res = await client.patch("/api/v1/admin/users/user-2/tier", json={"tier": "superadmin"}, headers=headers)
+        assert elevate_res.status_code == 403
+        assert "Only Super Administrators can elevate" in elevate_res.json()["detail"]
+
+        # 4. CANNOT create backups
+        backup_res = await client.post("/api/v1/admin/backups", headers=headers)
+        assert backup_res.status_code == 403
+
+        # 5. CANNOT suspend superadmin
+        suspend_res = await client.patch("/api/v1/admin/users/admin-1/status", json={"is_suspended": True}, headers=headers)
+        assert suspend_res.status_code == 403
+        assert "Operational Administrators cannot suspend other administrative accounts" in suspend_res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_self_downgrade_via_consumer_tier_route():
+    """Verify administrators are guarded against accidental self-downgrade via consumer tier API."""
+    admin_token = create_access_token("admin-1")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        res = await client.put("/api/v1/auth/tier", json={"tier": "free"}, headers=headers)
+        assert res.status_code == 403
+        assert "Administrative accounts cannot be modified via self-service" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_registration_blocks_self_assign_admin_role():
+    """Verify that public signup payloads cannot self-assign administrative roles."""
+    payload = {
+        "name": "Attacker",
+        "email": "attacker@gmail.com",
+        "password": "Password123!",
+        "role": "superadmin"
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        res = await client.post("/api/v1/auth/register", json=payload)
+        assert res.status_code == 201
+        data = res.json()["user"]
+        assert data["tier"] == "free"
+        assert data["role"] != "superadmin"
+        assert data["role"] == "Base User"
 

@@ -77,15 +77,21 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Implement calibrated TF-IDF similarity thresholds (`min_sim=0.16–0.18`) and intra-document context propagation across multi-sentence paragraphs.
 
 ### Phase 9: Super Admin Backend Engine
-- [x] Implement role-based access control (RBAC) ensuring only `superadmin` can access administrative routes.
+- [x] Implement Principle of Least Privilege (PoLP) two-tier role-based access control (RBAC), distinguishing Operational Administrators (`admin`) from Super Administrators (`superadmin`).
+- [x] Enforce `require_admin` dependency for non-destructive operations: user listing/filtering, user tier management for standard accounts (`free`, `pro`, `academic`), user moderation (suspension), system telemetry, and audit log inspection.
+- [x] Enforce `require_superadmin` dependency for destructive and root operations: user deletion, admin promotion/demotion, snapshot creation/download/restoration, and active learning model retraining.
+- [x] Implement registration sanitization on `POST /api/v1/auth/register`, stripping arbitrary administrative roles and locking new signups to `tier="free"`.
+- [x] Implement administrative self-demotion lockout guard on `PUT /api/v1/auth/tier`, preventing administrators from downgrading their tier via consumer subscription flows.
 - [x] Build User Management APIs in `backend/app/routers/admin.py` (user listing, search/filter, tier modification, account suspension).
 - [x] Build Database Telemetry APIs (collection stats, document counts, storage utilization, query latency).
 - [x] Build System Audit Log endpoints.
 
 ### Phase 10: Super Admin Management Dashboard (UI)
 - [x] Build dedicated `/admin` dashboard route with role protection.
+- [x] Support two-tier dashboard views: Operational Admin Console and Super Administrator Console.
 - [x] Create system overview cards: total verifications, active accounts, tier distribution, average credibility index, server status.
-- [x] Build an interactive User Management table with search, tier elevation, and account status controls.
+- [x] Build an interactive User Management table with search, tier elevation (with admin options restricted to superadmins), and account status controls (guarding admin accounts from operational admin suspension).
+- [x] Update `Header.tsx`, `Profile.tsx`, and `PricingModal.tsx` to safeguard administrative accounts from consumer tier modification and provide direct navigation to the Admin Console.
 
 ### Phase 11: In-UI Database Backup & One-Click Restore Center
 - [x] Implement backend backup engine generating compressed JSON/BSON archives of MongoDB collections directly via API.

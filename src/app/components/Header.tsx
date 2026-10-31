@@ -41,7 +41,8 @@ export function Header() {
       .toUpperCase();
   };
 
-  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin' || user?.email?.includes('admin');
+  const isSuperAdmin = tier === 'superadmin' || user?.role === 'superadmin';
+  const isAdmin = isSuperAdmin || tier === 'admin' || user?.role === 'admin';
 
   const tierBadges: Record<string, { label: string; class: string; icon: React.ElementType }> = {
     free: {
@@ -59,6 +60,11 @@ export function Header() {
       class: 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-500/20',
       icon: Crown,
     },
+    admin: {
+      label: 'Admin',
+      class: 'bg-indigo-50 text-indigo-800 border-indigo-300 ring-1 ring-indigo-500/30',
+      icon: ShieldCheck,
+    },
     superadmin: {
       label: 'Super Admin',
       class: 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-500/30',
@@ -66,7 +72,7 @@ export function Header() {
     },
   };
 
-  const currentTierBadge = isAdmin ? tierBadges.superadmin : (tierBadges[tier] || tierBadges.free);
+  const currentTierBadge = isSuperAdmin ? tierBadges.superadmin : (tierBadges[tier] || tierBadges.free);
   const TierIcon = currentTierBadge.icon;
 
   return (
@@ -100,14 +106,16 @@ export function Header() {
                 Verify News
               </Link>
 
-              <button
-                type="button"
-                onClick={() => setPricingOpen(true)}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Tiers & Pricing
-              </button>
+              {!isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setPricingOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  Tiers & Pricing
+                </button>
+              )}
 
               {isAdmin && (
                 <Link
@@ -117,7 +125,7 @@ export function Header() {
                   }`}
                 >
                   <LayoutDashboard className="w-3.5 h-3.5 text-emerald-600" />
-                  Super Admin
+                  {isSuperAdmin ? 'Super Admin' : 'Admin Console'}
                 </Link>
               )}
             </nav>
@@ -127,14 +135,25 @@ export function Header() {
               {isLoggedIn ? (
                 <div className="flex items-center gap-3">
                   {/* Account Tier Pill */}
-                  <button
-                    type="button"
-                    onClick={() => setPricingOpen(true)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all hover:scale-105 cursor-pointer ${currentTierBadge.class}`}
-                  >
-                    <TierIcon className="w-3.5 h-3.5" />
-                    <span>{currentTierBadge.label}</span>
-                  </button>
+                  {isAdmin ? (
+                    <Link
+                      to="/admin"
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all hover:scale-105 ${currentTierBadge.class}`}
+                      title="Administrative Account"
+                    >
+                      <TierIcon className="w-3.5 h-3.5" />
+                      <span>{currentTierBadge.label}</span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPricingOpen(true)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all hover:scale-105 cursor-pointer ${currentTierBadge.class}`}
+                    >
+                      <TierIcon className="w-3.5 h-3.5" />
+                      <span>{currentTierBadge.label}</span>
+                    </button>
+                  )}
 
                   {/* Dropdown Menu */}
                   <DropdownMenu>
@@ -175,17 +194,19 @@ export function Header() {
                         <DropdownMenuItem asChild>
                           <Link to="/admin" className="flex items-center gap-2 cursor-pointer text-xs py-2 text-emerald-700 font-medium">
                             <LayoutDashboard className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Super Admin Console</span>
+                            <span>{isSuperAdmin ? 'Super Admin Console' : 'Admin Console'}</span>
                           </Link>
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem
-                        onClick={() => setPricingOpen(true)}
-                        className="flex items-center gap-2 cursor-pointer text-xs py-2"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Manage Subscription Tier</span>
-                      </DropdownMenuItem>
+                      {!isAdmin && (
+                        <DropdownMenuItem
+                          onClick={() => setPricingOpen(true)}
+                          className="flex items-center gap-2 cursor-pointer text-xs py-2"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Manage Subscription Tier</span>
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={logout}
@@ -253,23 +274,25 @@ export function Header() {
             >
               Verify News
             </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setPricingOpen(true);
-              }}
-              className="block text-left w-full text-sm font-medium text-slate-700 hover:text-blue-600 py-1.5"
-            >
-              Tiers & Pricing
-            </button>
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setPricingOpen(true);
+                }}
+                className="block text-left w-full text-sm font-medium text-slate-700 hover:text-blue-600 py-1.5"
+              >
+                Tiers & Pricing
+              </button>
+            )}
             {isAdmin && (
               <Link
                 to="/admin"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block text-sm font-medium text-emerald-700 font-bold py-1.5"
               >
-                Super Admin Console
+                {isSuperAdmin ? 'Super Admin Console' : 'Admin Console'}
               </Link>
             )}
 

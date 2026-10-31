@@ -54,6 +54,15 @@ TITLES_AND_ROLES = {
     "fbi", "cia", "fda", "cdc", "who", "un", "ceo", "founder", "leader"
 }
 
+# High-profile institutional landmarks, government seats, and strategic geographic targets
+KNOWN_TARGETS_AND_LANDMARKS = {
+    "white house", "pentagon", "capitol", "kremlin", "buckingham palace",
+    "elysee", "vatican", "downing street", "eiffel tower", "wall street",
+    "broadway", "hollywood", "statue of liberty", "taj mahal", "colosseum",
+    "big ben", "bundestag", "reichstag", "un headquarters", "world health organization",
+    "cdc headquarters", "louvre", "notre dame", "westminster abbey"
+}
+
 
 def _stem(word: str) -> str:
     """Lightweight suffix stripping for robust morphological matching."""
@@ -73,7 +82,12 @@ ABSURDITY_PATTERNS = [
     r"\b(bioluminescent|subterranean)\b.*\bmetropolis\b",
     r"\bcrypto-(musicologist|zoologist)\b",
     r"\bflat earth\b",
-    r"\blizard people\b"
+    r"\blizard people\b",
+    r"\b(aliens?|extraterrestrials?|ufos?)\b.*\b(attacking|attacked|invading|invaded|destroyed|destroying|abducting|kidnapped)\b",
+    r"\b(ufo|alien|extraterrestrial)\b.*\b(white house|pentagon|capitol|kremlin)\b",
+    r"\btime travel(ler|ing)?\b.*\b(from the year|from 20\d\d|from 21\d\d)\b",
+    r"\b(secretly|secret)\b.*\b(reptilian|shape[- ]shifter|clone)\b",
+    r"\b(microchips?|nanobots?)\b.*\b(in vaccines?|mind control)\b"
 ]
 
 STOPWORDS = {
@@ -217,9 +231,9 @@ class CorroborationService:
             if not all(w in STOPWORDS for w in ent_words) and ent not in actors:
                 actors.append(ent)
 
-        # 2. Known institutional, religious, & leadership roles (case-insensitive)
+        # 2. Known institutional, religious, & leadership roles (case-insensitive with exact word boundaries)
         for role in ["prime minister", "president", "chancellor", "pope", "king", "queen", "elections committee"]:
-            if role in cleaned.lower() and role not in [a.lower() for a in actors]:
+            if re.search(rf"\b{re.escape(role)}\b", cleaned, flags=re.IGNORECASE) and role not in [a.lower() for a in actors]:
                 actors.append(role.title())
 
         # 3. Single capitalized proper nouns
@@ -234,12 +248,39 @@ class CorroborationService:
             if words:
                 actors.append(words[0].capitalize())
 
+        # 5. Filter out known landmarks from subject actors so they are strictly handled as target entities
+        actors = [a for a in actors if a.lower() not in KNOWN_TARGETS_AND_LANDMARKS]
+
         return actors
+
+    def _extract_targets(self, claim: str) -> list[str]:
+        """Extract explicit target institutions, landmarks, and recipient entities."""
+        cleaned = re.sub(r"^(according to|reported by|claims that|states that)\s+[^,]+,\s*", "", claim, flags=re.IGNORECASE)
+        targets: list[str] = []
+        cleaned_lower = cleaned.lower()
+
+        # 1. Match known high-profile landmarks and institutional targets
+        for landmark in KNOWN_TARGETS_AND_LANDMARKS:
+            if re.search(rf"\b{re.escape(landmark)}\b", cleaned_lower):
+                targets.append(landmark)
+
+        # 2. Match multi-word capitalized entities appearing after prepositions / actions (e.g. "attacked New York", "outside Downing Street")
+        prep_targets = re.findall(
+            r"\b(?:at|in|near|outside|attacking|bombing|targeting|against|around|to)\s+(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b",
+            cleaned
+        )
+        for pt in prep_targets:
+            pt_clean = pt.strip().lower()
+            if pt_clean not in STOPWORDS and pt_clean not in [t.lower() for t in targets]:
+                targets.append(pt_clean)
+
+        return targets
 
     def _extract_queries(self, claim: str, context_terms: list[str] | None = None) -> tuple[str, str, str]:
         """Construct primary salient keyword query, entity query, and concise search query."""
         cleaned = re.sub(r"^(according to|reported by|claims that|states that)\s+[^,]+,\s*", "", claim, flags=re.IGNORECASE)
         actors = self._extract_primary_actors(cleaned)
+        targets = self._extract_targets(cleaned)
         all_words = re.findall(r"\b[a-zA-Z0-9\.\-%]{2,}\b", cleaned)
 
         # 1. 4-digit years or numeric anchors
@@ -255,7 +296,16 @@ class CorroborationService:
                     seen_stems.add(st)
                     actor_tokens.append(tok)
 
-        # 3. Substantive content words (filtering out reporting fillers and non-salient adjectives)
+        # 3. Extract target tokens
+        target_tokens: list[str] = []
+        for t in targets:
+            for tok in t.split():
+                st = _stem(tok.lower())
+                if tok.lower() not in STOPWORDS and st not in seen_stems:
+                    seen_stems.add(st)
+                    target_tokens.append(tok)
+
+        # 4. Substantive content words (filtering out reporting fillers and non-salient adjectives)
         reporting_fillers = {
             "according", "report", "reported", "reports", "state", "stated", "states",
             "claim", "claims", "claimed", "official", "officials", "government",
@@ -286,21 +336,22 @@ class CorroborationService:
                     actor_tokens.append(ct)
                     seen_stems.add(st)
 
-        # Build concise query: Year (if any) + Actor tokens + Action word + Substantive topic nouns
+        # Build concise query: Year (if any) + Actor tokens + Action word + Target tokens + Substantive topic nouns
         concise_tokens: list[str] = []
         if years:
             concise_tokens.append(years[0])
         concise_tokens.extend(actor_tokens[:2])
         if action_word and action_word not in concise_tokens:
             concise_tokens.append(action_word)
+        concise_tokens.extend(target_tokens[:2])
 
         # Prioritize key topic nouns (e.g., words ending with 's' or substantive terms)
         topic_nouns = [w for w in substantive if w.lower().endswith("s") or len(w) >= 4]
         for tn in (topic_nouns or substantive):
-            if tn not in concise_tokens and len(concise_tokens) < 5:
+            if tn not in concise_tokens and len(concise_tokens) < 6:
                 concise_tokens.append(tn)
 
-        concise_q = " ".join(concise_tokens[:5])
+        concise_q = " ".join(concise_tokens[:6])
 
         # Build salient query: up to 8 descriptive terms
         salient_tokens = list(concise_tokens)
@@ -445,18 +496,20 @@ class CorroborationService:
             return res
 
         # B. Corroborating evidence found from accredited press
-        if corroborating_sources:
-            primary = corroborating_sources[0]
-            confidence = min(80.0 + (len(corroborating_sources) * 4.0), 96.0)
-            top_publishers = [s.publisher for s in corroborating_sources[:3] if s.publisher]
+        high_quality_sources = [s for s in corroborating_sources if (s.similarity_score or 0) >= 60.0]
+        if high_quality_sources or len(corroborating_sources) >= 2:
+            sources_to_use = high_quality_sources if high_quality_sources else corroborating_sources
+            primary = sources_to_use[0]
+            confidence = min(80.0 + (len(sources_to_use) * 4.0), 96.0)
+            top_publishers = [s.publisher for s in sources_to_use[:3] if s.publisher]
             pub_str = ", ".join(top_publishers) if top_publishers else primary.publisher
             res = ClaimResult(
                 claim=claim,
                 status="verified",
                 confidence=confidence,
-                sources=len(corroborating_sources),
-                explanation=f"Corroborated by {len(corroborating_sources)} independent news source(s) including {pub_str}.",
-                source_links=corroborating_sources[:4]
+                sources=len(sources_to_use),
+                explanation=f"Corroborated by {len(sources_to_use)} independent news source(s) including {pub_str}.",
+                source_links=sources_to_use[:4]
             )
             self._claim_cache[claim] = res
             return res
@@ -514,7 +567,7 @@ class CorroborationService:
                     if not clean_title:
                         clean_title = raw_title
 
-                    if not self._is_claim_relevant(claim, clean_title, min_sim=0.18):
+                    if not self._is_claim_relevant(claim, clean_title, min_sim=0.22):
                         continue
 
                     sim = self._compute_overlap(claim, clean_title)
@@ -523,7 +576,7 @@ class CorroborationService:
                         "description": f"Published in {publisher} on {pub_date}" if pub_date else f"Reported by {publisher}",
                         "url": url,
                         "publisher": publisher,
-                        "similarity": round(max(sim * 100, 78.0), 1),
+                        "similarity": round(min(max(sim * 100, 65.0), 96.0), 1),
                         "timestamp": pub_date
                     })
 
@@ -573,7 +626,7 @@ class CorroborationService:
                         continue
 
                     combined_candidate = f"{title} {snippet}"
-                    if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.16):
+                    if not self._is_claim_relevant(claim, combined_candidate, min_sim=0.22):
                         continue
 
                     # Deduce publisher name from domain
@@ -585,7 +638,7 @@ class CorroborationService:
                         "description": snippet,
                         "url": f"https://{url_text}" if not url_text.startswith("http") else url_text,
                         "publisher": publisher.capitalize(),
-                        "similarity": round(max(sim * 100, 75.0), 1)
+                        "similarity": round(min(max(sim * 100, 60.0), 95.0), 1)
                     })
 
                 if matches:
@@ -597,16 +650,35 @@ class CorroborationService:
 
     def _is_claim_relevant(self, claim: str, candidate_text: str, min_sim: float = 0.20) -> bool:
         """
-        Semantic overlap, predicate alignment, and subject anchoring safeguard:
-        Verifies that candidate text is genuinely reporting on the same assertion
-        and primary actors rather than an unrelated third party.
+        Semantic overlap, predicate alignment, target anchoring, and subject anchoring safeguard:
+        Verifies that candidate text is genuinely reporting on the same assertion,
+        primary actors, and target entities rather than an unrelated third party.
         """
         cleaned = re.sub(r"^(according to|reported by|claims that|states that)\s+[^,]+,\s*", "", claim, flags=re.IGNORECASE)
         actors = self._extract_primary_actors(cleaned)
+        targets = self._extract_targets(cleaned)
 
-        # 1. Subject / Actor Anchoring Check:
         cand_words = set(w.lower() for w in re.findall(r"\b[a-zA-Z0-9]{3,}\b", candidate_text))
         cand_stems = set(_stem(w) for w in cand_words)
+
+        # 1. Target / Landmark Anchor Check:
+        # If the claim specifies a landmark or target entity (e.g. "White House"),
+        # the candidate article MUST explicitly mention it.
+        if targets:
+            cand_lower = candidate_text.lower()
+            target_found = False
+            for t in targets:
+                if t in cand_lower:
+                    target_found = True
+                    break
+                t_words = [w for w in t.split() if w not in STOPWORDS]
+                if t_words and all(tw in cand_words or _stem(tw) in cand_stems for tw in t_words):
+                    target_found = True
+                    break
+            if not target_found:
+                return False
+
+        # 2. Subject / Actor Anchoring Check:
         actor_found = False
         if actors:
             for a in actors:
@@ -626,7 +698,7 @@ class CorroborationService:
         intersection = stems1.intersection(stems2)
         sim = len(intersection) / len(stems1)
 
-        # 2. Non-Entity Substantive Stem Overlap Check:
+        # 3. Non-Entity Substantive Stem Overlap Check:
         # If candidate only overlaps on the subject entity name (e.g., 'pope'), that is NOT enough to claim relevance
         if actors:
             actor_stems = set()
@@ -646,15 +718,24 @@ class CorroborationService:
             if topic_stems and not (non_actor_intersection - action_stems) and sim < 0.40:
                 return False
 
-        # If actor was not explicitly matched, require stronger non-actor overlap (>= 3 stems and sim >= 0.20)
+        # Determine if actors contain real proper nouns or institutional roles
+        has_proper_actor = any(
+            a.lower() in [r.lower() for r in TITLES_AND_ROLES]
+            or any(w[0].isupper() for w in a.split() if w.lower() not in STOPWORDS)
+            for a in actors
+        )
+        if has_proper_actor and not actor_found:
+            return False
+
+        # If actor was not explicitly matched, require stronger non-actor overlap (>= 3 stems and sim >= 0.25)
         if actors and not actor_found:
-            if len(intersection) < 3 or sim < 0.20:
+            if len(intersection) < 3 or sim < 0.25:
                 return False
 
         if sim < min_sim:
             return False
 
-        # 3. Action / Predicate alignment check
+        # 4. Action / Predicate alignment check
         claim_actions = [root for root in ACTION_ROOTS if any(w.startswith(root) for w in stems1)]
         cand_actions = [root for root in ACTION_ROOTS if any(w.startswith(root) for w in stems2)]
 
@@ -774,7 +855,7 @@ class CorroborationService:
                     pub = (art.get("source") or {}).get("name") or "News Outlet"
 
                     candidate_snippet = f"{title} {desc}"
-                    if not self._is_claim_relevant(claim, candidate_snippet, min_sim=0.18):
+                    if not self._is_claim_relevant(claim, candidate_snippet, min_sim=0.22):
                         continue
 
                     sim = self._compute_overlap(claim, candidate_snippet)
@@ -784,7 +865,7 @@ class CorroborationService:
                             "description": desc,
                             "url": url,
                             "publisher": pub,
-                            "similarity": round(max(sim * 100, 78.0), 1)
+                            "similarity": round(min(max(sim * 100, 60.0), 95.0), 1)
                         })
                 if matches:
                     return matches
@@ -821,7 +902,7 @@ class CorroborationService:
                 pub = item.get("displayLink") or "Web Source"
 
                 candidate_snippet = f"{title} {desc}"
-                if not self._is_claim_relevant(claim, candidate_snippet, min_sim=0.18):
+                if not self._is_claim_relevant(claim, candidate_snippet, min_sim=0.22):
                     continue
 
                 sim = self._compute_overlap(claim, candidate_snippet)
@@ -831,7 +912,7 @@ class CorroborationService:
                         "description": desc,
                         "url": url,
                         "publisher": pub,
-                        "similarity": round(max(sim * 100, 78.0), 1)
+                        "similarity": round(min(max(sim * 100, 60.0), 95.0), 1)
                     })
             return matches
         except Exception as e:
@@ -877,10 +958,21 @@ class CorroborationService:
                         data = opensearch_resp.json()
                         titles = data[1] if len(data) > 1 else []
 
+                NON_VERIFYING_TITLES = [
+                    r"^(list of|category:|conspiracy theor|folklore|mythology|fictional|urban legend|hoax)",
+                    r"\b(in popular culture|in fiction|in film|filmography)\b"
+                ]
+
                 for top_title in titles[:2]:
                     if top_title in visited_titles:
                         continue
                     visited_titles.add(top_title)
+
+                    # Do not verify kinetic assertions from list or folklore pages
+                    claim_words = re.findall(r"\b[a-zA-Z]{3,}\b", claim.lower())
+                    has_kinetic_action = any(any(w.startswith(root) for root in ACTION_ROOTS) for w in claim_words)
+                    if has_kinetic_action and any(re.search(pat, top_title, re.IGNORECASE) for pat in NON_VERIFYING_TITLES):
+                        continue
 
                     # Fetch full introductory section via Action API
                     ext_resp = await client.get(
@@ -916,12 +1008,13 @@ class CorroborationService:
                         continue
 
                     sim = self._compute_overlap(claim, extract)
-                    if self._is_claim_relevant(claim, extract, min_sim=0.16):
+                    if self._is_claim_relevant(claim, extract, min_sim=0.25) and sim >= 0.28:
                         safe_title = top_title.replace(" ", "_")
+                        calibrated_sim = round(min(max(sim * 100, 65.0), 94.0), 1)
                         return ClaimResult(
                             claim=claim,
                             status="verified",
-                            confidence=min(round(max(sim * 100, 84.0), 1), 94.0),
+                            confidence=calibrated_sim,
                             sources=1,
                             explanation=f"Corroborated by encyclopedic archive on Wikipedia: '{top_title}'.",
                             source_links=[
@@ -929,7 +1022,7 @@ class CorroborationService:
                                     title=f"Wikipedia: {top_title}",
                                     url=f"https://en.wikipedia.org/wiki/{safe_title}",
                                     publisher="Wikipedia Knowledge Base",
-                                    similarity_score=round(max(sim * 100, 84.0), 1),
+                                    similarity_score=calibrated_sim,
                                     snippet=extract[:220] + "..." if len(extract) > 220 else extract
                                 )
                             ]

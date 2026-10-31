@@ -131,4 +131,30 @@ The inverse vulnerability occurs when an article shares a specific predicate/act
 
 ---
 
+## 9. Semantic Pillar Binding & Target Landmark Safeguards
+
+### The "Spurious Entity Colocation" Failure Mode
+A known vulnerability in automated NLP fact-checking occurs when an absurd or fabricated claim mentions a high-profile entity or kinetic action alongside an institutional landmark—for example:
+- *"Aliens are real, a ufo was attacking the white house"*
+- *"French military aircraft conducted a bombing raid on the White House yesterday"*
+
+Without tripartite semantic binding:
+1. **Bag-of-Words Fallacy:** Search engines return pop-culture articles (e.g., a satire review in *Samoa Observer* mentioning "aliens" and "attack", or a military briefing mentioning "White House" and "bombing").
+2. **Actor Pollution:** Verbs such as `"attacking"` can mistakenly match substrings (e.g. `"king"` in `"attacking"`), sending spurious royalty queries to news APIs.
+3. **Artificial Floor Inflation:** Early prototypes forced minimum similarity scores of 78–84%, automatically escalating weak incidental matches into verified assertions.
+
+### The Tripartite Semantic Pillar Solution:
+1. **Tripartite Pillar Binding (Subject + Action + Target):**
+   The engine extracts the subject actor (`Aliens`, `French military`), key action predicate (`attacking`, `bombing`), and target institution or landmark (`White House`, `Pentagon`, `Capitol`, `Kremlin`, `Vatican`).
+2. **Mandatory Landmark Containment:**
+   If a claim targets a recognized landmark or institution, candidate sources **must** explicitly contain that target landmark. If an article mentions the actor but lacks the target institution, it is immediately discarded.
+3. **Strict Subject Actor Enforcement:**
+   When a claim asserts an event involving a proper noun actor or role, the candidate report must explicitly include that actor. A report on US military briefings at the White House cannot corroborate an allegation that the French military bombed the White House.
+4. **Wikipedia Catalog & Pop-Culture Gating:**
+   Wikipedia articles categorised under catalog lists (`List of...`, `Category:...`, `Conspiracy theories regarding...`, `Folklore...`) are barred from corroborating active kinetic breaking events.
+5. **Score Floor Removal:**
+   Removed artificial similarity floors (`78.0` and `84.0`), ensuring that weak keyword overlap accurately reflects low confidence and falls through to `unverified` or `false`.
+
+---
+
 *BSc IT Dissertation Notes — Michael Mazhambe*

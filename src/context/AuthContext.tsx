@@ -21,7 +21,11 @@ interface AuthContextType {
   loading: boolean;
   isLoggedIn: boolean;
   tier: AccountTier;
-  login: (credentials: any) => Promise<void>;
+  login: (credentials: any) => Promise<{ requiresOtp?: boolean; email?: string; devOtp?: string | null }>;
+  loginVerifyOtp: (email: string, otp: string) => Promise<void>;
+  signupRequestOtp: (payload: any) => Promise<{ status: string; message: string; email: string; dev_otp?: string | null }>;
+  signupVerifyOtp: (email: string, otp: string) => Promise<void>;
+  resendOtp: (email: string, purpose: "signup" | "login") => Promise<{ status: string; message: string; dev_otp?: string | null }>;
   register: (payload: any) => Promise<void>;
   updateProfile: (payload: any) => Promise<void>;
   changeTier: (tier: AccountTier) => Promise<void>;
@@ -74,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (credentials: any) => {
+  const login = async (credentials: any): Promise<{ requiresOtp?: boolean; email?: string; devOtp?: string | null }> => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
       const email = (credentials.email || "").trim().toLowerCase();
@@ -104,11 +108,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("veritas_token", "mock-token-abc");
       localStorage.setItem("veritas_user", JSON.stringify(mockUser));
       setLoading(false);
-      return;
+      return { requiresOtp: false };
     }
 
     try {
       const data = await veritasAPI.login(credentials);
+      if (data.requires_otp) {
+        return {
+          requiresOtp: true,
+          email: data.email || credentials.email,
+          devOtp: data.dev_otp
+        };
+      }
+      setToken(data.access_token);
+      setUser(data.user);
+      if (data.access_token) {
+        localStorage.setItem("veritas_token", data.access_token);
+      }
+      if (data.user) {
+        localStorage.setItem("veritas_user", JSON.stringify(data.user));
+      }
+      return { requiresOtp: false };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginVerifyOtp = async (email: string, otp: string) => {
+    setLoading(true);
+    try {
+      const data = await veritasAPI.loginVerifyOtp(email, otp);
       setToken(data.access_token);
       setUser(data.user);
       localStorage.setItem("veritas_token", data.access_token);
@@ -116,6 +145,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const signupRequestOtp = async (payload: any) => {
+    return await veritasAPI.signupRequestOtp(payload);
+  };
+
+  const signupVerifyOtp = async (email: string, otp: string) => {
+    setLoading(true);
+    try {
+      const data = await veritasAPI.signupVerifyOtp(email, otp);
+      setToken(data.access_token);
+      setUser(data.user);
+      localStorage.setItem("veritas_token", data.access_token);
+      localStorage.setItem("veritas_user", JSON.stringify(data.user));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendOtp = async (email: string, purpose: "signup" | "login") => {
+    return await veritasAPI.resendOtp(email, purpose);
   };
 
   const register = async (payload: any) => {
@@ -221,6 +271,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn: !!token,
         tier: currentTier,
         login,
+        loginVerifyOtp,
+        signupRequestOtp,
+        signupVerifyOtp,
+        resendOtp,
         register,
         updateProfile,
         changeTier,

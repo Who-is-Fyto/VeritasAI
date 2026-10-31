@@ -27,6 +27,7 @@ python-multipart==0.0.20      # File upload support
 slowapi==0.1.9                # Rate limiting
 PyJWT==2.10.1                 # JWT token generation
 bcrypt==4.2.0                 # Password hashing
+resend>=2.50.1                # Transactional email & OTP delivery
 
 
 # ── Testing ────────────────────────────────────────────────────────────────

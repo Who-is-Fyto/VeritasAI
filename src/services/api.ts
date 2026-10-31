@@ -778,6 +778,26 @@ export const veritasAPI = {
     request("/api/v1/health"),
 
   /**
+   * POST /api/v1/auth/signup/request-otp
+   * Request a 6-digit verification PIN to initiate account registration.
+   */
+  signupRequestOtp: (payload: any): Promise<{ status: string; message: string; email: string; expires_in_seconds: number; dev_otp?: string | null }> =>
+    request("/api/v1/auth/signup/request-otp", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  /**
+   * POST /api/v1/auth/signup/verify-otp
+   * Verify 6-digit PIN and finalize account registration.
+   */
+  signupVerifyOtp: (email: string, otp: string): Promise<{ access_token: string; token_type: string; user: any }> =>
+    request("/api/v1/auth/signup/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ email, otp }),
+    }),
+
+  /**
    * POST /api/v1/auth/register
    * Create a new user account. Returns token and user profile.
    */
@@ -789,12 +809,41 @@ export const veritasAPI = {
 
   /**
    * POST /api/v1/auth/login
-   * Authentic user credentials and returns access token.
+   * Authenticate user credentials. Returns token directly for superadmin,
+   * or dispatches OTP PIN and returns requires_otp: true for standard accounts.
    */
-  login: (payload: any): Promise<any> =>
+  login: (payload: any): Promise<{
+    access_token: string | null;
+    token_type: string;
+    user: any;
+    requires_otp: boolean;
+    email?: string | null;
+    message?: string | null;
+    dev_otp?: string | null;
+  }> =>
     request("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  /**
+   * POST /api/v1/auth/login/verify-otp
+   * Verify 6-digit sign-in PIN and issue session access token.
+   */
+  loginVerifyOtp: (email: string, otp: string): Promise<{ access_token: string; token_type: string; user: any }> =>
+    request("/api/v1/auth/login/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ email, otp }),
+    }),
+
+  /**
+   * POST /api/v1/auth/resend-otp
+   * Resend a fresh 6-digit verification PIN.
+   */
+  resendOtp: (email: string, purpose: "signup" | "login"): Promise<{ status: string; message: string; email: string; expires_in_seconds: number; dev_otp?: string | null }> =>
+    request("/api/v1/auth/resend-otp", {
+      method: "POST",
+      body: JSON.stringify({ email, purpose }),
     }),
 
   /**

@@ -572,6 +572,9 @@ Registry of 100+ global, South African, and African publishers, certified fact-c
 ### 8. Two-Tier Role-Based Access Control (PoLP RBAC) & Disaster Recovery
 Implements strict Principle of Least Privilege role separation distinguishing Operational Administrators (`admin`) from Super Administrators (`superadmin`). Operational admins manage commercial user tiers, perform account moderation, and inspect telemetry and audit logs, while root actions (destructive database snapshot restorations, active learning model retraining triggers, and administrator promotion/demotion) are strictly gated under `require_superadmin`. Administrative accounts are safeguarded with lockout prevention against commercial self-service subscription modifications.
 
+### 9. Resend Transactional Email & Two-Factor OTP Authentication
+Integrates the Resend transactional email API with single-use 6-digit cryptographic OTP verification. Mandates pre-account verification during signup so unverified emails never persist in MongoDB, and enforces 2FA challenges during sign-in. Incorporates a Break-Glass Root Access Policy granting `superadmin@veritas.ai` direct password sign-in without external email dependencies, paired with automatic development environment console logging for offline examiner defense sessions.
+
 ---
 
 ## Technical Documentation

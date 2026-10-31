@@ -640,6 +640,12 @@ class CorroborationService:
             if non_actor_stems1 and not non_actor_intersection:
                 return False
 
+            # Require that non_actor_intersection contains more than just generic actions when total claim has multiple substantive terms
+            action_stems = set(root for root in ACTION_ROOTS if any(w.startswith(root) for w in stems1))
+            topic_stems = non_actor_stems1 - action_stems
+            if topic_stems and not (non_actor_intersection - action_stems) and sim < 0.40:
+                return False
+
         # If actor was not explicitly matched, require stronger non-actor overlap (>= 3 stems and sim >= 0.20)
         if actors and not actor_found:
             if len(intersection) < 3 or sim < 0.20:

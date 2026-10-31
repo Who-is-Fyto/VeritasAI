@@ -196,6 +196,60 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp: str = Field(..., min_length=6, max_length=6)
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+    @field_validator("otp")
+    @classmethod
+    def clean_otp(cls, v: str) -> str:
+        clean = v.strip()
+        if not re.match(r"^\d{6}$", clean):
+            raise ValueError("Verification code must be exactly 6 numeric digits")
+        return clean
+
+
+class ResendOtpRequest(BaseModel):
+    email: str
+    purpose: str = "signup"
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+    @field_validator("purpose")
+    @classmethod
+    def validate_purpose(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if clean not in {"signup", "login"}:
+            raise ValueError("Purpose must be 'signup' or 'login'")
+        return clean
+
+
+class OtpResponse(BaseModel):
+    status: str = "success"
+    message: str
+    email: str
+    expires_in_seconds: int = 600
+    dev_otp: str | None = None
+
+
+class LoginResponse(BaseModel):
+    access_token: str | None = None
+    token_type: str = "bearer"
+    user: UserResponse | None = None
+    requires_otp: bool = False
+    email: str | None = None
+    message: str | None = None
+    dev_otp: str | None = None
+
+
 class APIKeyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
 

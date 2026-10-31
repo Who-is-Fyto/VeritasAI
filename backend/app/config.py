@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     news_api_key: str = ""
     google_api_key: str = ""
     google_cse_id: str = ""
+    resend_api_key: str = ""
+    resend_from_email: str = "VeritasAI Security <onboarding@resend.dev>"
 
     # CORS
     cors_origins: str | list[str] = ["http://localhost:5173"]

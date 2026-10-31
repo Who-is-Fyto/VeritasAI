@@ -102,7 +102,7 @@ A recurring challenge in NLP verification systems is distinguishing genuine, biz
 The system maintains 100% automated test pass rates across both Python backend and TypeScript frontend components.
 
 ### 4.1 Backend Pytest Execution
-To execute the complete 33-test suite against the backend virtual environment:
+To execute the complete 34-test suite against the backend virtual environment:
 
 ```bash
 cd /home/michael/Downloads/VeritasAI/backend
@@ -114,11 +114,12 @@ cd /home/michael/Downloads/VeritasAI/backend
 - `tests/test_admin.py`: 10 passed (RBAC access gating, user listing, tier elevation, suspension self-guard, telemetry, backup creation, backup lifecycle, operational admin permissions & PoLP boundaries, self-downgrade lockout prevention, registration admin role stripping)
 - `tests/test_certificate.py`: 3 passed (audit certificate generation, cryptographic hashing, 404 handling)
 - `tests/test_auth.py`: 1 passed (full registration, duplicate prevention, login, JWT verification, developer API keys)
+- `tests/test_otp.py`: 1 passed (full OTP signup & login lifecycle, pre-account isolation, invalid code rejection, rate-limiting, and superadmin root direct access)
 - `tests/test_trainer.py`: 1 passed (active learning ML loop, model training task queue, status polling)
 - `tests/test_analysis.py`: 9 passed (text analysis, health endpoint, guest scans, analysis caching, anti-spoofing, satire detection, predicate alignment, live fact check debunking, subject actor anchoring)
 - `tests/test_stylometrics.py`: 3 passed (forensic stylometrics human prose, synthetic prose, API payload)
 
-**Overall:** 33 passed, 0 failed.
+**Overall:** 34 passed, 0 failed.
 
 ### 4.2 Frontend Production Build Verification
 To execute production TypeScript compilation and asset bundling:
@@ -143,20 +144,25 @@ When conducting an interactive examination demonstration, follow this step-by-st
    - Enter `yd@g.com`. Observe immediate client-side block: *"Domain label 'g' is too short"*. Submit button remains disabled.
    - Enter `student@tempmail.com`. Observe block: *"Disposable and temporary email domains are not allowed"*.
    - Enter `michael@student.richfield.ac.za`. Observe immediate green checkmark and dynamic institutional badge rendering (*"Richfield Faculty of ICT · BSc Information Technology Student"*).
-2. **Demonstrating Two-Tier Role-Based Access Control (PoLP RBAC):**
+2. **Demonstrating Email Verification & Two-Factor Authentication (Resend OTP):**
+   - On `/signup`, submit registration details for a new user. Observe transition to the 6-digit PIN verification screen without an account yet created in MongoDB.
+   - Show that submitting an incorrect PIN is rejected with remaining attempt count. Enter the verified PIN to finalize account creation and receive a JWT.
+   - Navigate to `/login`. Sign in as the newly created user; observe the 2FA challenge requiring the 6-digit confirmation PIN.
+   - Sign in as `superadmin@veritas.ai`. Observe immediate direct authentication bypassing the email OTP under the **Break-Glass Root Administrator direct-access policy**.
+3. **Demonstrating Two-Tier Role-Based Access Control (PoLP RBAC):**
    - Log in as Operational Administrator (`admin` tier). Observe the **Operational Admin Console** view. Verify that user listing, telemetry, and audit logs are accessible, but destructive snapshot restoration and administrative promotion are restricted.
    - Open the **Pricing Modal** while logged in as an administrator. Observe the administrative safeguard banner indicating that consumer plan switching is locked for administrators, preventing accidental self-demotion and lockout.
-3. **Demonstrating Commercial Tiers & Verification Limits:**
+4. **Demonstrating Commercial Tiers & Verification Limits:**
    - Log in as Free Community user.
    - Navigate to `/verify`. Note daily scan quota badge (5 scans/day).
    - Click *"Upgrade / Compare Tiers"* to inspect the commercial plan comparison modal.
-4. **Demonstrating the Credibility Index & Audit Certificate:**
+5. **Demonstrating the Credibility Index & Audit Certificate:**
    - Submit a test article on `/verify`.
    - On the results page, inspect the PolitiFact-style Truth-O-Meter gauge, NewsGuard-style Source Authority nutrition label, and claim accordion.
    - Click *"Export Credibility Certificate"* in the action bar or top ribbon.
    - Inspect the formal certificate with unique verification reference ID (`VER-XXXXXXXX`), issue timestamp, cryptographic SHA-256 attestation hash, and MCDA formula.
    - Click *"Print / Save PDF"* to view the clean, border-aligned A4 print layout.
-5. **Demonstrating Super Admin Governance & In-UI Database Backup:**
+6. **Demonstrating Super Admin Governance & In-UI Database Backup:**
    - Log in as `superadmin@veritas.ai`.
    - Navigate to `/admin`.
    - View real-time database telemetry and security audit ledger.
@@ -164,7 +170,7 @@ When conducting an interactive examination demonstration, follow this step-by-st
    - Click *"Create System Backup"*. Observe instant snapshot archive generation with SHA-256 hash.
    - Click *"Download"* to stream the `.zip` archive.
    - Click *"Restore"*. Note the double-confirmation modal requiring the user to type `"RESTORE"`. Explain the superadmin auto-preservation safeguard that prevents administrator lockout.
-6. **Demonstrating Historical & Multi-Sentence Corroboration (The Emu War Scenario):**
+7. **Demonstrating Historical & Multi-Sentence Corroboration (The Emu War Scenario):**
    - On `/verify`, select the **Pasted Text** input mode.
    - Paste the 1932 Great Emu War historical narrative.
    - Run verification. Observe the **80.4 / 100 Verified Factual** score.

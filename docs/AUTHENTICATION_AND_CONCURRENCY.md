@@ -158,4 +158,34 @@ In the frontend, `PricingModal.tsx` detects administrative status, displays a pr
 
 ---
 
+## 6. Resend Transactional Email & Two-Factor OTP Authentication
+
+### The Problem:
+Unverified email registrations enable bad actors to create disposable accounts, exhaust compute resources for RoBERTa transformer inference, and flood feedback datasets with poisoned training samples. Furthermore, single-factor password logins remain susceptible to credential stuffing and phishing attacks.
+
+### The Solution:
+We implemented an enterprise-grade Two-Factor Authentication (2FA) and email verification pipeline powered by **Resend** (`https://api.resend.com/emails`) and MongoDB:
+
+1. **Two-Stage Registration with Pre-Account Verification:**
+   - On `/signup`, submitting personal details invokes `POST /api/v1/auth/signup/request-otp`.
+   - The user record is **not** committed to the `users` collection yet. Instead, a cryptographically random 6-digit PIN (`secrets.randbelow(900000) + 100000`) is generated and hashed using SHA-256 into a temporary `verification_otps` collection with a 10-minute expiration timestamp.
+   - An asynchronous HTTP request via `httpx.AsyncClient` delivers a responsive, branded HTML email template via Resend.
+   - When the user enters the PIN, `POST /api/v1/auth/signup/verify-otp` validates the token, inserts the verified user into MongoDB, clears the temporary record, and returns a session JWT.
+
+2. **Credential Sign-In with 2FA Challenge:**
+   - Submitting email and password to `POST /api/v1/auth/login` verifies the bcrypt hash.
+   - For standard accounts, the endpoint dispatches a 6-digit sign-in PIN to the user's email and responds with `{ "requires_otp": true }`.
+   - The user enters the PIN on the frontend, submitting to `POST /api/v1/auth/login/verify-otp` to receive their session token.
+
+3. **Break-Glass Root Access Policy (Superadmin Direct Bypass):**
+   - The root Superadmin account (`superadmin@veritas.ai`) is configured with an internal institutional mock domain lacking a public MX mail exchange.
+   - Enforcing an email OTP on this identity would result in permanent administrator lockout if external delivery failed.
+   - The backend enforces a **Break-Glass Root Access Policy**: entering valid superadmin credentials immediately issues the root JWT without an OTP challenge, ensuring disaster recovery capabilities are never obstructed by third-party mail gateways.
+
+4. **Examiner Defense & Offline Presentation Resiliency:**
+   - In development mode (`APP_ENV=development`) or when `RESEND_API_KEY` is not configured, the generated OTP is logged directly to the server terminal (`[VERITAS-AI OTP CODE] >> XXXXXX <<`) and returned in the response payload (`dev_otp`).
+   - This ensures live examiner demonstrations can be conducted smoothly even in environments with restricted external network access or spotty campus Wi-Fi.
+
+---
+
 *BSc IT Dissertation Notes — Michael Mazhambe*

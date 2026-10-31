@@ -26,6 +26,10 @@ VeritasAI v1.5 transforms the platform from a single-user prototype into a comme
 - [x] Build strict email validation logic to block malformed or nonsense addresses (e.g., `yd@g.com`, single-character domain segments, missing MX structure, invalid TLDs).
 - [x] Add real-time visual validation feedback (field-level success/error borders, inline helper text, dynamic submit button states).
 - [x] Ensure backend validation parity in `backend/app/schemas/auth.py` and `backend/app/schemas/request.py`.
+- [x] Implement Resend transactional email verification during account signup (pre-account OTP gating ensuring unverified emails never persist in MongoDB).
+- [x] Implement sign-in Two-Factor Authentication (2FA) with 6-digit single-use OTP verification.
+- [x] Implement Break-Glass Root Administrator direct-access bypass for `superadmin@veritas.ai`.
+- [x] Implement development environment terminal & UI fallback for offline presentation and examiner defense resilience.
 
 ### Phase 3: Multi-Tier Account Architecture
 - [x] Define formal account tier models across backend schemas and frontend state:

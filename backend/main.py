@@ -34,9 +34,12 @@ async def lifespan(app: FastAPI):
     logger.info("VeritasAI v%s starting up…", settings.app_version)
     await connect_db()
     try:
-        await admin.ensure_superadmin_seeded(get_db())
+        db = get_db()
+        await admin.ensure_superadmin_seeded(db)
+        await db["verification_otps"].create_index("expires_at", expireAfterSeconds=0)
+        await db["verification_otps"].create_index([("email", 1), ("purpose", 1)])
     except Exception as e:
-        logger.warning("Could not run superadmin bootstrap: %s", e)
+        logger.warning("Could not run superadmin bootstrap / index setup: %s", e)
     # Model is already instantiated as a module-level singleton in
     # linguistic.py — no additional loading needed here unless you want
     # to pre-warm it with a dummy inference pass.

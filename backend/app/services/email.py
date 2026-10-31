@@ -126,17 +126,24 @@ def _send_smtp_sync(
     msg.attach(MIMEText(plain_text, "plain", "utf-8"))
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
+    # Extract raw email address for SMTP envelope MAIL FROM
+    import re
+    envelope_match = re.search(r"<([^>]+)>", sender)
+    envelope_from = envelope_match.group(1).strip() if envelope_match else sender.strip()
+    if not envelope_from or "@" not in envelope_from:
+        envelope_from = smtp_user
+
     if smtp_port == 465:
         with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
             server.login(smtp_user, smtp_password)
-            server.sendmail(sender, [to_email], msg.as_string())
+            server.sendmail(envelope_from, [to_email], msg.as_string())
     else:
         with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
             server.ehlo()
             server.starttls()
             server.ehlo()
             server.login(smtp_user, smtp_password)
-            server.sendmail(sender, [to_email], msg.as_string())
+            server.sendmail(envelope_from, [to_email], msg.as_string())
     return True
 
 

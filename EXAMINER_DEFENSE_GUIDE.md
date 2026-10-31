@@ -144,7 +144,7 @@ When conducting an interactive examination demonstration, follow this step-by-st
    - Enter `yd@g.com`. Observe immediate client-side block: *"Domain label 'g' is too short"*. Submit button remains disabled.
    - Enter `student@tempmail.com`. Observe block: *"Disposable and temporary email domains are not allowed"*.
    - Enter `michael@student.richfield.ac.za`. Observe immediate green checkmark and dynamic institutional badge rendering (*"Richfield Faculty of ICT · BSc Information Technology Student"*).
-2. **Demonstrating Email Verification & Two-Factor Authentication (Resend OTP):**
+2. **Demonstrating Email Verification & Two-Factor Authentication (SMTP / 2FA OTP):**
    - On `/signup`, submit registration details for a new user. Observe transition to the 6-digit PIN verification screen without an account yet created in MongoDB.
    - Show that submitting an incorrect PIN is rejected with remaining attempt count. Enter the verified PIN to finalize account creation and receive a JWT.
    - Navigate to `/login`. Sign in as the newly created user; observe the 2FA challenge requiring the 6-digit confirmation PIN.

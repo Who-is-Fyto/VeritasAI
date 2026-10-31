@@ -254,7 +254,7 @@ async def signup_request_otp(
     })
 
     await send_otp_email(clean_email, otp, purpose="signup")
-    dev_otp = otp if (settings.app_env == "development" or not settings.resend_api_key) else None
+    dev_otp = otp if (settings.app_env == "development" or not (settings.smtp_user and settings.smtp_password)) else None
 
     return OtpResponse(
         status="success",
@@ -488,7 +488,7 @@ async def login(
         })
 
         await send_otp_email(clean_email, otp, purpose="login")
-        dev_otp = otp if (settings.app_env == "development" or not settings.resend_api_key) else None
+        dev_otp = otp if (settings.app_env == "development" or not (settings.smtp_user and settings.smtp_password)) else None
 
         logger.info("Dispatched sign-in OTP for user: %s", clean_email)
 
@@ -639,7 +639,7 @@ async def resend_otp(
     )
 
     await send_otp_email(clean_email, otp, purpose=body.purpose)
-    dev_otp = otp if (settings.app_env == "development" or not settings.resend_api_key) else None
+    dev_otp = otp if (settings.app_env == "development" or not (settings.smtp_user and settings.smtp_password)) else None
 
     return OtpResponse(
         status="success",

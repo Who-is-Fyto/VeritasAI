@@ -158,18 +158,18 @@ In the frontend, `PricingModal.tsx` detects administrative status, displays a pr
 
 ---
 
-## 6. Resend Transactional Email & Two-Factor OTP Authentication
+## 6. Transactional Email & Two-Factor OTP Authentication (SMTP / 2FA)
 
 ### The Problem:
 Unverified email registrations enable bad actors to create disposable accounts, exhaust compute resources for RoBERTa transformer inference, and flood feedback datasets with poisoned training samples. Furthermore, single-factor password logins remain susceptible to credential stuffing and phishing attacks.
 
 ### The Solution:
-We implemented an enterprise-grade Two-Factor Authentication (2FA) and email verification pipeline powered by **Resend** (`https://api.resend.com/emails`) and MongoDB:
+We implemented an enterprise-grade Two-Factor Authentication (2FA) and email verification pipeline powered by **Standard SMTP** (supporting Gmail SMTP, Outlook, and institutional mail relays) and MongoDB:
 
 1. **Two-Stage Registration with Pre-Account Verification:**
    - On `/signup`, submitting personal details invokes `POST /api/v1/auth/signup/request-otp`.
    - The user record is **not** committed to the `users` collection yet. Instead, a cryptographically random 6-digit PIN (`secrets.randbelow(900000) + 100000`) is generated and hashed using SHA-256 into a temporary `verification_otps` collection with a 10-minute expiration timestamp.
-   - An asynchronous HTTP request via `httpx.AsyncClient` delivers a responsive, branded HTML email template via Resend.
+   - A non-blocking thread via `asyncio.to_thread` delivers a responsive, branded HTML email template via standard SMTP with STARTTLS encryption.
    - When the user enters the PIN, `POST /api/v1/auth/signup/verify-otp` validates the token, inserts the verified user into MongoDB, clears the temporary record, and returns a session JWT.
 
 2. **Credential Sign-In with 2FA Challenge:**
@@ -183,7 +183,7 @@ We implemented an enterprise-grade Two-Factor Authentication (2FA) and email ver
    - The backend enforces a **Break-Glass Root Access Policy**: entering valid superadmin credentials immediately issues the root JWT without an OTP challenge, ensuring disaster recovery capabilities are never obstructed by third-party mail gateways.
 
 4. **Examiner Defense & Offline Presentation Resiliency:**
-   - In development mode (`APP_ENV=development`) or when `RESEND_API_KEY` is not configured, the generated OTP is logged directly to the server terminal (`[VERITAS-AI OTP CODE] >> XXXXXX <<`) and returned in the response payload (`dev_otp`).
+   - In development mode (`APP_ENV=development`) or when SMTP credentials (`SMTP_USER`, `SMTP_PASSWORD`) are not configured, the generated OTP is logged directly to the server terminal (`[VERITAS-AI OTP CODE] >> XXXXXX <<`) and returned in the response payload (`dev_otp`).
    - This ensures live examiner demonstrations can be conducted smoothly even in environments with restricted external network access or spotty campus Wi-Fi.
 
 ---

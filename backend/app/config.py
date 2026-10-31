@@ -36,8 +36,13 @@ class Settings(BaseSettings):
     news_api_key: str = ""
     google_api_key: str = ""
     google_cse_id: str = ""
-    resend_api_key: str = ""
-    resend_from_email: str = "VeritasAI Security <onboarding@resend.dev>"
+
+    # SMTP Email Configuration (e.g., Gmail SMTP with App Password)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
 
     # CORS
     cors_origins: str | list[str] = ["http://localhost:5173"]

@@ -1,11 +1,15 @@
 """
 VeritasAI Transactional Email & OTP Service
 ──────────────────────────────────────────
-Provides email dispatch via Resend for user account creation and sign-in OTP verification.
+Provides email dispatch via standard SMTP (Gmail SMTP, Outlook, or custom relays)
+for user account creation and sign-in OTP verification.
 Includes fallback logging for development environments and live examiner demonstrations.
 """
+import asyncio
 import logging
-import httpx
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -98,11 +102,49 @@ def build_otp_html(otp: str, purpose: str = "signup") -> str:
 """
 
 
+def _send_smtp_sync(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: str,
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_password: str,
+    from_email: str,
+) -> bool:
+    """
+    Synchronous SMTP execution routine executed in an async executor thread.
+    Handles STARTTLS (port 587 / standard) and SSL (port 465) transports.
+    """
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    sender = from_email.strip() if from_email.strip() else f"VeritasAI Security <{smtp_user}>"
+    msg["From"] = sender
+    msg["To"] = to_email
+
+    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+    msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+    if smtp_port == 465:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+            server.login(smtp_user, smtp_password)
+            server.sendmail(sender, [to_email], msg.as_string())
+    else:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(sender, [to_email], msg.as_string())
+    return True
+
+
 async def send_otp_email(to_email: str, otp: str, purpose: str = "signup") -> bool:
     """
-    Sends an OTP verification email to the specified recipient via Resend.
-    If RESEND_API_KEY is not configured or in development mode, logs the OTP
-    to the server console so tests and presentations are never disrupted.
+    Sends an OTP verification email to the specified recipient via SMTP (e.g. Gmail).
+    If SMTP credentials are not configured or in development mode, logs the OTP
+    to the server console so tests and offline presentations are never disrupted.
     """
     clean_email = to_email.strip().lower()
     subject = (
@@ -111,6 +153,11 @@ async def send_otp_email(to_email: str, otp: str, purpose: str = "signup") -> bo
         else f"VeritasAI Sign-in Code: {otp}"
     )
     html_content = build_otp_html(otp, purpose)
+    plain_text = (
+        f"VeritasAI One-Time Verification PIN: {otp}\n"
+        f"Action: {'Account Registration' if purpose == 'signup' else 'Sign-in Authorization'}\n"
+        f"Valid for 10 minutes. If you did not initiate this request, ignore this message."
+    )
 
     # 1. Dev & Fallback Logging for immediate inspection & offline defense
     logger.info("=================================================================")
@@ -118,45 +165,32 @@ async def send_otp_email(to_email: str, otp: str, purpose: str = "signup") -> bo
     logger.info("[VERITAS-AI OTP CODE] >> %s << (Valid for 10 minutes)", otp)
     logger.info("=================================================================")
 
-    # 2. Check if Resend API key is present
-    api_key = (settings.resend_api_key or "").strip()
-    if not api_key:
+    # 2. Check if SMTP credentials are configured
+    smtp_user = (settings.smtp_user or "").strip()
+    smtp_password = (settings.smtp_password or "").strip()
+    if not smtp_user or not smtp_password:
         logger.info(
-            "RESEND_API_KEY is not configured. OTP printed to server logs for development testing."
+            "SMTP credentials not configured (SMTP_USER / SMTP_PASSWORD). "
+            "OTP logged to server console for development mode."
         )
         return True
 
-    # 3. Dispatch via Resend REST API using httpx async client
+    # 3. Dispatch via SMTP non-blockingly using asyncio.to_thread
     try:
-        from_email = settings.resend_from_email or "VeritasAI Security <onboarding@resend.dev>"
-        payload = {
-            "from": from_email,
-            "to": [clean_email],
-            "subject": subject,
-            "html": html_content,
-        }
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(
-                "https://api.resend.com/emails",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-
-        if res.status_code in {200, 201}:
-            data = res.json()
-            logger.info("Email dispatched successfully via Resend. ID: %s", data.get("id"))
-            return True
-        else:
-            logger.warning(
-                "Resend API returned status %s: %s. Falling back to local verification.",
-                res.status_code,
-                res.text,
-            )
-            return False
+        await asyncio.to_thread(
+            _send_smtp_sync,
+            to_email=clean_email,
+            subject=subject,
+            html_content=html_content,
+            plain_text=plain_text,
+            smtp_host=settings.smtp_host,
+            smtp_port=settings.smtp_port,
+            smtp_user=smtp_user,
+            smtp_password=smtp_password,
+            from_email=settings.smtp_from_email,
+        )
+        logger.info("OTP verification email dispatched successfully via SMTP to %s", clean_email)
+        return True
     except Exception as e:
-        logger.error("Failed to send email via Resend: %s. Continuing with fallback.", e)
+        logger.error("Failed to send OTP email via SMTP to %s: %s", clean_email, e)
         return False

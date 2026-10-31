@@ -68,12 +68,7 @@ export function Login() {
 
   return (
     <div className="min-h-screen py-16 flex items-center justify-center bg-gradient-to-b from-blue-50/30 via-white to-blue-50/20 px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45 }}
-        className="w-full max-w-md bg-white border border-blue-200/50 rounded-2xl shadow-xl p-8 clip-corner-xl"
-      >
+      <div className="w-full max-w-md bg-white border border-blue-200/50 rounded-2xl shadow-xl p-8 clip-corner-xl animate-in fade-in duration-200">
         {/* Header Logo */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
@@ -229,7 +224,7 @@ export function Login() {
             Sign Up Free
           </Link>
         </p>
-      </motion.div>
+      </div>
       <style>{CLIP_STYLES}</style>
     </div>
   );

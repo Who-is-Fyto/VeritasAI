@@ -131,12 +131,7 @@ export function PipelineTracker({
   return (
     <div className="w-full space-y-8">
       {/* Tracker Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="bg-white rounded-2xl border border-blue-200/80 shadow-xl p-6 sm:p-8 overflow-hidden relative"
-      >
+      <div className="bg-white rounded-2xl border border-blue-200/80 shadow-xl p-6 sm:p-8 overflow-hidden relative animate-in fade-in duration-300">
         {/* Subtle background glow */}
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-indigo-100/40 rounded-full blur-3xl pointer-events-none" />
@@ -344,16 +339,11 @@ export function PipelineTracker({
             <div ref={logEndRef} />
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Shimmering Skeleton Layout Preview */}
       {showSkeletonPreview && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="space-y-6 pointer-events-none opacity-70"
-        >
+        <div className="space-y-6 pointer-events-none opacity-70 animate-in fade-in duration-300">
           <div className="text-center mb-2">
             <span className="text-xs uppercase font-bold tracking-wider text-slate-500">
               Report Layout Preparing in Background...
@@ -395,7 +385,7 @@ export function PipelineTracker({
             <Skeleton className="h-4 w-5/6 rounded" />
             <Skeleton className="h-4 w-4/6 rounded" />
           </div>
-        </motion.div>
+        </div>
       )}
     </div>
   );

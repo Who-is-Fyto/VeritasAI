@@ -213,7 +213,7 @@ export function Verify() {
   return (
     <div className="min-h-screen py-12 lg:py-20 bg-gradient-to-b from-blue-50/30 to-white">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}>
+        <div className="animate-in fade-in duration-200">
 
           {/* Header */}
           <div className="text-center mb-12">
@@ -584,7 +584,7 @@ export function Verify() {
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
 
       {/* Commercial Account Tiers Modal */}

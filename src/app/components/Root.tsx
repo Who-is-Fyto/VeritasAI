@@ -1,12 +1,9 @@
-import { Outlet, useLocation, Link } from "react-router";
+import { Outlet, Link } from "react-router";
 import { Header } from "./Header";
 import { BrandLogo } from "./ui/BrandLogo";
-import { motion, AnimatePresence } from "motion/react";
 import { ShieldCheck, Cpu, Scale, Search, ExternalLink } from "lucide-react";
 
 export function Root() {
-  const location = useLocation();
-
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Background Newsroom Grid Texture */}
@@ -16,18 +13,8 @@ export function Root() {
       <Header />
 
       {/* Main Routed Content */}
-      <main className="flex-1 relative z-10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+      <main className="flex-1 relative z-10 min-h-0">
+        <Outlet />
       </main>
 
       {/* Authoritative Newsroom Footer */}

@@ -317,6 +317,14 @@ export function Results() {
     }
   }, [id, loadedResult]);
 
+  // Ensure all charting engines and layout observers compute dimensions immediately on mount
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
 
   const handleFeedback = async (isAccurate: boolean, correctedLabel: string) => {
     setFeedbackLoading(true);
@@ -495,11 +503,7 @@ export function Results() {
   return (
     <div className="min-h-screen py-10 lg:py-16 bg-gradient-to-b from-blue-50/30 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-        >
+        <div className="animate-in fade-in duration-200">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8 no-print">
             <button
@@ -734,13 +738,13 @@ export function Results() {
           {/* ── Main analytics grid ── */}
           <div className="grid lg:grid-cols-3 gap-6 mb-6">
             {/* Dimension bar chart */}
-            <div className="lg:col-span-2 bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
+            <div className="lg:col-span-2 min-w-0 bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
               <div className="flex items-center gap-2 mb-6">
                 <BarChart2 className="w-5 h-5 text-blue-600" />
                 <h3>Credibility Dimensions</h3>
               </div>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-60 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                   <BarChart data={dimensionData} barSize={36}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
@@ -1027,7 +1031,7 @@ export function Results() {
               )}
             </button>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Official Credibility Audit Certificate Modal */}

@@ -60,37 +60,37 @@ export function PresentationDeck() {
       content: (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center h-full">
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-950/60 border border-blue-500/40 text-blue-300 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
               <span>Final Academic Examination</span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-              Veritas<span className="text-blue-600">AI</span> Multimodal Credibility Engine
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+              Veritas<span className="text-blue-400">AI</span> Multimodal Credibility Engine
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
+            <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
               An explainable, multi-dimensional artificial intelligence framework engineered for real-time digital news verification, forensic NLP analysis, and automated provenance auditing.
             </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-200">
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-800">
+              <div className="p-3 bg-slate-800/80 border border-slate-700/80 rounded-xl">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Candidate</span>
-                <span className="text-xs font-bold text-slate-900">Michael Mazhambe</span>
+                <span className="text-xs font-bold text-white">Michael Mazhambe</span>
               </div>
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+              <div className="p-3 bg-slate-800/80 border border-slate-700/80 rounded-xl">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Qualification</span>
-                <span className="text-xs font-bold text-slate-900">BSc Information Technology</span>
+                <span className="text-xs font-bold text-white">BSc Information Technology</span>
               </div>
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl col-span-2 sm:col-span-1">
+              <div className="p-3 bg-slate-800/80 border border-slate-700/80 rounded-xl col-span-2 sm:col-span-1">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Architecture</span>
-                <span className="text-xs font-bold text-blue-600">4-Pillar Ensemble Engine</span>
+                <span className="text-xs font-bold text-blue-400">4-Pillar Ensemble Engine</span>
               </div>
             </div>
           </div>
 
           <div className="lg:col-span-5 flex justify-center">
-            <div className="w-full max-w-md bg-gradient-to-br from-slate-900 to-blue-950 p-7 rounded-3xl text-white shadow-2xl border border-slate-800 space-y-5">
+            <div className="w-full max-w-md bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/80 p-7 rounded-3xl text-white shadow-2xl border border-slate-800 space-y-5">
               <div className="flex items-center justify-between pb-4 border-b border-slate-800">
                 <BrandLogo size="md" variant="white" showBadge={true} badgeText="v1.5 Flagship" />
                 <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
@@ -147,47 +147,47 @@ export function PresentationDeck() {
         "The motivation for VeritasAI stems from a documented vulnerability in modern digital discourse. Studies such as Vosoughi et al. published in Science demonstrate that falsehood spreads six times faster than verified truth on social networks. Existing commercial solutions suffer from three fundamental flaws: first, black-box LLMs hallucinate and cannot cite provenance; second, shallow keyword filters trigger widespread false positives; third, modern disinformation campaigns exploit synthetic domain spoofing and sensationalist emotional phrasing.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full items-stretch">
-          <div className="p-6 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-4 flex flex-col justify-between">
+          <div className="p-6 bg-rose-950/30 border border-rose-500/30 rounded-2xl space-y-4 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-rose-900/50 text-rose-300 flex items-center justify-center border border-rose-500/40">
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 text-base">The Infodemic Velocity</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h3 className="font-bold text-white text-base">The Infodemic Velocity</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Empirical research confirms fabricated headlines spread 600% faster than verified corrections. Automated bot swarms and generative AI tools allow bad actors to produce convincing propaganda at zero marginal cost.
               </p>
             </div>
-            <div className="p-3 bg-white rounded-xl border border-rose-200/80 text-[11px] text-rose-800 font-semibold">
+            <div className="p-3 bg-rose-950/60 rounded-xl border border-rose-500/40 text-[11px] text-rose-200 font-semibold">
               Finding: Human cognitive confirmation bias prevents manual fact-checking from scaling.
             </div>
           </div>
 
-          <div className="p-6 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-4 flex flex-col justify-between">
+          <div className="p-6 bg-amber-950/30 border border-amber-500/30 rounded-2xl space-y-4 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-900/50 text-amber-300 flex items-center justify-center border border-amber-500/40">
                 <Cpu className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 text-base">Black-Box LLM Hallucinations</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h3 className="font-bold text-white text-base">Black-Box LLM Hallucinations</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 General-purpose large language models (e.g. standard GPT/Claude prompts) lack deterministic fact grounding, frequently hallucinate false citations, and cannot provide verifiable cryptographic audit trails required by institutional publishers.
               </p>
             </div>
-            <div className="p-3 bg-white rounded-xl border border-amber-200/80 text-[11px] text-amber-800 font-semibold">
+            <div className="p-3 bg-amber-950/60 rounded-xl border border-amber-500/40 text-[11px] text-amber-200 font-semibold">
               Flaw: Opaque probability scores give journalists no evidence to defend editorial decisions.
             </div>
           </div>
 
-          <div className="p-6 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-4 flex flex-col justify-between">
+          <div className="p-6 bg-blue-950/30 border border-blue-500/30 rounded-2xl space-y-4 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-blue-900/50 text-blue-300 flex items-center justify-center border border-blue-500/40">
                 <Award className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 text-base">The VeritasAI Solution</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h3 className="font-bold text-white text-base">The VeritasAI Solution</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 An explainable, multi-dimensional verification architecture combining four independent pillars of evidence: transformer attention, syntactic stylometrics, wire corroboration, and domain authority.
               </p>
             </div>
-            <div className="p-3 bg-white rounded-xl border border-blue-200/80 text-[11px] text-blue-800 font-semibold">
+            <div className="p-3 bg-blue-950/60 rounded-xl border border-blue-500/40 text-[11px] text-blue-200 font-semibold">
               Deliverable: Sub-800ms latency with HMAC-SHA256 verifiable provenance certificates.
             </div>
           </div>
@@ -206,53 +206,53 @@ export function PresentationDeck() {
       content: (
         <div className="space-y-6 h-full flex flex-col justify-between">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-white border-2 border-blue-600 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
-              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-blue-50 select-none">40%</span>
-              <div className="flex items-center gap-2 text-blue-600">
+            <div className="p-4 bg-slate-800/80 border border-blue-500/40 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
+              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-slate-700/40 select-none">40%</span>
+              <div className="flex items-center gap-2 text-blue-400">
                 <Cpu className="w-4 h-4" />
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900">Pillar 1: Linguistic AI</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-white">Pillar 1: Linguistic AI</h4>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 RoBERTa Transformer fine-tuned on deception corpora. Token attention saliency mapping highlights hyperbole and deception cues.
               </p>
             </div>
 
-            <div className="p-4 bg-white border-2 border-indigo-600 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
-              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-indigo-50 select-none">15%</span>
-              <div className="flex items-center gap-2 text-indigo-600">
+            <div className="p-4 bg-slate-800/80 border border-indigo-500/40 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
+              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-slate-700/40 select-none">15%</span>
+              <div className="flex items-center gap-2 text-indigo-400">
                 <Scale className="w-4 h-4" />
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900">Pillar 2: Stylometrics</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-white">Pillar 2: Stylometrics</h4>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Forensic NLP syntactic parsing via Spacy. Type-Token Ratio (TTR), clause complexity, and emotional divergence metrics.
               </p>
             </div>
 
-            <div className="p-4 bg-white border-2 border-emerald-600 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
-              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-emerald-50 select-none">25%</span>
-              <div className="flex items-center gap-2 text-emerald-600">
+            <div className="p-4 bg-slate-800/80 border border-emerald-500/40 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
+              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-slate-700/40 select-none">25%</span>
+              <div className="flex items-center gap-2 text-emerald-400">
                 <Search className="w-4 h-4" />
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900">Pillar 3: Wire Corroboration</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-white">Pillar 3: Wire Corroboration</h4>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Semantic Pillar Binding against Wikipedia and live media wires. Actor-target role containment blocks unanchored false matches.
               </p>
             </div>
 
-            <div className="p-4 bg-white border-2 border-amber-600 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
-              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-amber-50 select-none">20%</span>
-              <div className="flex items-center gap-2 text-amber-600">
+            <div className="p-4 bg-slate-800/80 border border-amber-500/40 rounded-2xl shadow-xs space-y-2 relative overflow-hidden">
+              <span className="absolute -right-2 -bottom-2 text-4xl font-black text-slate-700/40 select-none">20%</span>
+              <div className="flex items-center gap-2 text-amber-400">
                 <ShieldCheck className="w-4 h-4" />
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900">Pillar 4: Source Authority</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-white">Pillar 4: Source Authority</h4>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Media Bias / Fact Check (MBFC) taxonomy, IANA WHOIS domain age tracking, SSL/TLS certificate verification, and academic routing.
               </p>
             </div>
           </div>
 
           {/* Data Flow Diagram Card */}
-          <div className="p-5 bg-slate-900 text-white rounded-2xl shadow-md space-y-3">
+          <div className="p-5 bg-slate-900 text-white rounded-2xl shadow-md space-y-3 border border-slate-800">
             <div className="flex items-center justify-between text-xs font-mono border-b border-slate-800 pb-2">
               <span className="text-slate-400">DATA_FLOW_PIPELINE &bull; CONCURRENT ASYNC EXECUTION</span>
               <span className="text-emerald-400">P95 LATENCY &lt; 840ms</span>
@@ -295,32 +295,32 @@ export function PresentationDeck() {
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
-            <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-2xl space-y-2">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-blue-600" />
+            <div className="p-4 bg-blue-950/40 border border-blue-500/30 rounded-2xl space-y-2">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-blue-400" />
                 <span>Transformer Training & Transfer Learning</span>
               </h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Fine-tuned across 128,000 verified factual and deceptive claims. Captures subtle contextual semantics such as deceptive hedging, false certainty markers, and pseudo-scientific syntax.
               </p>
             </div>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-500" />
+            <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
                 <span>Attention Saliency Extraction</span>
               </h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Unlike opaque classifiers, VeritasAI exposes token attention gradients. Words indicating manufactured consensus (e.g. &ldquo;undeniable secret&rdquo;, &ldquo;what they hide&rdquo;) receive highlighted visual flags.
               </p>
             </div>
 
-            <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-2">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl space-y-2">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
                 <span>Active Self-Training Loop</span>
               </h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Our in-app Superadmin Console features a background continuous learning engine capable of incorporating verified editorial feedback into model retuning pipelines.
               </p>
             </div>
@@ -362,41 +362,47 @@ export function PresentationDeck() {
         "Pillar 2 provides deterministic forensic NLP metrics that operate independently of neural weights. Using Spacy and NLTK, we extract Type-Token Ratios to measure vocabulary poverty, Flesch-Kincaid grade levels for syntactic complexity, and an emotional volatility index. Clickbait and synthetic disinfo characteristically exhibit low lexical diversity combined with extreme polarity divergence.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 h-full items-stretch">
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-              1
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-900/50 text-indigo-300 flex items-center justify-center font-bold border border-indigo-500/40">
+                1
+              </div>
+              <h4 className="font-bold text-white text-sm">Lexical Diversity (TTR)</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Computes Type-Token Ratio and Brunet&apos;s W measure. Disinformation and automated churn mills repeat emotive adjectives, resulting in measurably depressed lexical diversity compared to investigative journalism.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Lexical Diversity (TTR)</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Computes Type-Token Ratio and Brunet&apos;s W measure. Disinformation and automated churn mills repeat emotive adjectives, resulting in measurably depressed lexical diversity compared to investigative journalism.
-            </p>
-            <div className="p-2.5 bg-indigo-50/60 rounded-xl text-[11px] font-mono text-indigo-800">
+            <div className="p-2.5 bg-indigo-950/60 rounded-xl text-[11px] font-mono text-indigo-300 border border-indigo-500/30">
               Threshold: TTR &lt; 0.42 flags synthetic repetition.
             </div>
           </div>
 
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-              2
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-900/50 text-blue-300 flex items-center justify-center font-bold border border-blue-500/40">
+                2
+              </div>
+              <h4 className="font-bold text-white text-sm">Syntactic Tree Complexity</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Analyzes dependency trees, subordinate clause frequency, and passive voice ratios using Spacy parser. Credible reportage features balanced clause hierarchies, whereas deceptive content leans heavily on imperative exhortations.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Syntactic Tree Complexity</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Analyzes dependency trees, subordinate clause frequency, and passive voice ratios using Spacy parser. Credible reportage features balanced clause hierarchies, whereas deceptive content leans heavily on imperative exhortations.
-            </p>
-            <div className="p-2.5 bg-blue-50/60 rounded-xl text-[11px] font-mono text-blue-800">
+            <div className="p-2.5 bg-blue-950/60 rounded-xl text-[11px] font-mono text-blue-300 border border-blue-500/30">
               Metric: Mean clause depth &gt; 3.2 indicates rigor.
             </div>
           </div>
 
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-              3
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-900/50 text-emerald-300 flex items-center justify-center font-bold border border-emerald-500/40">
+                3
+              </div>
+              <h4 className="font-bold text-white text-sm">Sensationalism Divergence</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Measures the delta between headline emotional intensity and body paragraph factual assertiveness. Exaggerated discrepancies immediately trigger sensationalism penalties.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Sensationalism Divergence</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Measures the delta between headline emotional intensity and body paragraph factual assertiveness. Exaggerated discrepancies immediately trigger sensationalism penalties.
-            </p>
-            <div className="p-2.5 bg-emerald-50/60 rounded-xl text-[11px] font-mono text-emerald-800">
+            <div className="p-2.5 bg-emerald-950/60 rounded-xl text-[11px] font-mono text-emerald-300 border border-emerald-500/30">
               Output: Normalized Sensationalism Index (0-100).
             </div>
           </div>
@@ -415,30 +421,30 @@ export function PresentationDeck() {
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
-            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <div className="p-4 bg-amber-950/30 border border-amber-500/30 rounded-2xl space-y-2">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
                 <span>The Naive Search Failure Mode</span>
               </h4>
-              <p className="text-xs text-slate-700 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Standard bag-of-words or unconstrained vector search extracts loose keywords (e.g. &ldquo;UFO&rdquo;), matching historical encyclopedia lists (&ldquo;List of reported UFO sightings&rdquo;) and falsely awarding high credibility to absurd claims.
               </p>
             </div>
 
-            <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-2">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <div className="p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl space-y-2">
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span>Semantic Pillar Binding Architecture</span>
               </h4>
-              <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4 leading-relaxed">
+              <ul className="text-xs text-slate-300 space-y-1.5 list-disc pl-4 leading-relaxed">
                 <li>
-                  <strong>Target & Landmark Extraction:</strong> Enforces geographic and institutional containment (e.g., &ldquo;White House&rdquo;, &ldquo;Pentagon&rdquo;, &ldquo;Cape Town&rdquo;).
+                  <strong className="text-white">Target & Landmark Extraction:</strong> Enforces geographic and institutional containment (e.g., &ldquo;White House&rdquo;, &ldquo;Pentagon&rdquo;, &ldquo;Cape Town&rdquo;).
                 </li>
                 <li>
-                  <strong>Catalog Page Disqualification:</strong> Explicitly bars meta-indexes and historical list pages from verifying acute physical events.
+                  <strong className="text-white">Catalog Page Disqualification:</strong> Explicitly bars meta-indexes and historical list pages from verifying acute physical events.
                 </li>
                 <li>
-                  <strong>Kinetic Actor Binding:</strong> Uses exact word-boundary regex matching to prevent spurious entity collisions.
+                  <strong className="text-white">Kinetic Actor Binding:</strong> Uses exact word-boundary regex matching to prevent spurious entity collisions.
                 </li>
               </ul>
             </div>
@@ -481,41 +487,47 @@ export function PresentationDeck() {
         "The fourth pillar examines the publisher's digital infrastructure. We maintain an authoritative taxonomy based on Media Bias / Fact Check covering over 4,000 news organizations. When a URL is analyzed, we perform real-time WHOIS verification to detect disposable newly-registered domains often created for disinformation blitzes, evaluate SSL certificates, and apply institutional trust routing for verified educational and academic domains.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 h-full items-stretch">
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-              <Database className="w-4 h-4" />
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-900/50 text-blue-300 flex items-center justify-center font-bold border border-blue-500/40">
+                <Database className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-white text-sm">Media Bias / Fact Check (MBFC)</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Curated repository of 4,000+ domain reputations categorized across bias orientation, historical factual accuracy rating, and institutional ownership transparency.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Media Bias / Fact Check (MBFC)</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Curated repository of 4,000+ domain reputations categorized across bias orientation, historical factual accuracy rating, and institutional ownership transparency.
-            </p>
-            <div className="p-2.5 bg-blue-50/60 rounded-xl text-[11px] font-mono text-blue-800">
+            <div className="p-2.5 bg-blue-950/60 rounded-xl text-[11px] font-mono text-blue-300 border border-blue-500/30">
               Levels: Very High &bull; High &bull; Mixed &bull; Questionable &bull; Conspiracy
             </div>
           </div>
 
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-              <Server className="w-4 h-4" />
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-900/50 text-indigo-300 flex items-center justify-center font-bold border border-indigo-500/40">
+                <Server className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-white text-sm">IANA WHOIS Provenance</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Newly registered domains (&lt; 30 days) are heavily penalized. Synthetic imposter websites mimicking reputable outlets (e.g. &ldquo;bbc-breaking-news.com&rdquo;) are immediately caught by domain age divergence.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">IANA WHOIS Provenance</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Newly registered domains (&lt; 30 days) are heavily penalized. Synthetic imposter websites mimicking reputable outlets (e.g. &ldquo;bbc-breaking-news.com&rdquo;) are immediately caught by domain age divergence.
-            </p>
-            <div className="p-2.5 bg-indigo-50/60 rounded-xl text-[11px] font-mono text-indigo-800">
+            <div className="p-2.5 bg-indigo-950/60 rounded-xl text-[11px] font-mono text-indigo-300 border border-indigo-500/30">
               Safeguard: Detects fleeting ephemeral disinformation sites.
             </div>
           </div>
 
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-              <Lock className="w-4 h-4" />
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-900/50 text-emerald-300 flex items-center justify-center font-bold border border-emerald-500/40">
+                <Lock className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-white text-sm">SSL TLS & Academic Routing</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Verifies certificate cryptographic validity, cipher suites, and issuer authenticity. Verified academic domains (e.g. <code className="font-mono text-[10px] bg-slate-700/60 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">.ac.za</code>, <code className="font-mono text-[10px] bg-slate-700/60 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">.edu</code>) receive preferential institutional trust weighting.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">SSL TLS & Academic Routing</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Verifies certificate cryptographic validity, cipher suites, and issuer authenticity. Verified academic domains (e.g. <code className="font-mono text-[10px]">.ac.za</code>, <code className="font-mono text-[10px]">.edu</code>) receive preferential institutional trust weighting.
-            </p>
-            <div className="p-2.5 bg-emerald-50/60 rounded-xl text-[11px] font-mono text-emerald-800">
+            <div className="p-2.5 bg-emerald-950/60 rounded-xl text-[11px] font-mono text-emerald-300 border border-emerald-500/30">
               Trust Score: Boosted for verified higher education bodies.
             </div>
           </div>
@@ -534,26 +546,26 @@ export function PresentationDeck() {
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
-            <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-xs">
-              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-                <Database className="w-4 h-4 text-emerald-600" />
+            <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <Database className="w-4 h-4 text-emerald-400" />
                 <span>Document Schema Architecture</span>
               </div>
-              <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-4 leading-relaxed">
-                <li><strong className="text-slate-800">users:</strong> Password hashes (bcrypt/pbkdf2), affiliations, subscription tiers, and suspension states.</li>
-                <li><strong className="text-slate-800">results:</strong> Complete multi-dimensional scoring breakdown, extracted entities, and HMAC signatures.</li>
-                <li><strong className="text-slate-800">audit_logs:</strong> Immutable ledger tracking all administrative actions with client IP and timestamps.</li>
-                <li><strong className="text-slate-800">verification_otps:</strong> Ephemeral PIN hashes with automated TTL expiration.</li>
+              <ul className="text-xs text-slate-300 space-y-1.5 list-disc pl-4 leading-relaxed">
+                <li><strong className="text-emerald-400 font-mono">users:</strong> Password hashes (bcrypt/pbkdf2), affiliations, subscription tiers, and suspension states.</li>
+                <li><strong className="text-emerald-400 font-mono">results:</strong> Complete multi-dimensional scoring breakdown, extracted entities, and HMAC signatures.</li>
+                <li><strong className="text-emerald-400 font-mono">audit_logs:</strong> Immutable ledger tracking all administrative actions with client IP and timestamps.</li>
+                <li><strong className="text-emerald-400 font-mono">verification_otps:</strong> Ephemeral PIN hashes with automated TTL expiration.</li>
               </ul>
             </div>
 
-            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
-              <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
-                <HardDrive className="w-4 h-4 text-blue-600" />
+            <div className="p-4 bg-blue-950/40 border border-blue-500/30 rounded-2xl space-y-2">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <HardDrive className="w-4 h-4 text-blue-400" />
                 <span>TTL Indexing & Memory Optimization</span>
               </div>
-              <p className="text-xs text-blue-800 leading-relaxed">
-                Created index on <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-blue-200">expires_at</code> with <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-blue-200">expireAfterSeconds: 0</code>. Expired security tokens are cleanly garbage collected by the MongoDB storage engine.
+              <p className="text-xs text-blue-200 leading-relaxed">
+                Created index on <code className="font-mono text-[11px] bg-blue-900/50 text-blue-200 px-1.5 py-0.5 rounded border border-blue-500/40">expires_at</code> with <code className="font-mono text-[11px] bg-blue-900/50 text-blue-200 px-1.5 py-0.5 rounded border border-blue-500/40">expireAfterSeconds: 0</code>. Expired security tokens are cleanly garbage collected by the MongoDB storage engine.
               </p>
             </div>
           </div>
@@ -603,32 +615,32 @@ export function PresentationDeck() {
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
-            <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-xs">
-              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-                <FileArchive className="w-4 h-4 text-amber-600" />
+            <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <FileArchive className="w-4 h-4 text-amber-400" />
                 <span>3-2-1 Backup Architecture</span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Compressed BSON/JSON ZIP archives generated with SHA-256 integrity checksums and metadata descriptors. Stored in primary storage and concurrently mirrored to secondary disaster storage.
               </p>
             </div>
 
-            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
-              <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
-                <RefreshCw className="w-4 h-4 text-emerald-600" />
+            <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl space-y-2">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <RefreshCw className="w-4 h-4 text-emerald-400" />
                 <span>Automated Background Supervisor</span>
               </div>
-              <p className="text-xs text-emerald-800 leading-relaxed">
+              <p className="text-xs text-emerald-200 leading-relaxed">
                 Background worker in FastAPI lifespan checks snapshot intervals every hour. Automatically creates point-in-time snapshots and prunes older automated archives beyond the retention threshold (5 snapshots).
               </p>
             </div>
 
-            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
-              <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
-                <RotateCcw className="w-4 h-4 text-blue-600" />
+            <div className="p-4 bg-blue-950/40 border border-blue-500/30 rounded-2xl space-y-2">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <RotateCcw className="w-4 h-4 text-blue-400" />
                 <span>Admin Preservation Safeguard</span>
               </div>
-              <p className="text-xs text-blue-800 leading-relaxed">
+              <p className="text-xs text-blue-200 leading-relaxed">
                 During disaster recovery restoration, the active Super Administrator account is re-seeded and preserved post-restore to prevent administrative lockout.
               </p>
             </div>
@@ -641,7 +653,7 @@ export function PresentationDeck() {
             </div>
 
             <div className="space-y-2.5 text-xs">
-              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 space-y-1">
+              <div className="p-3 bg-slate-800/80 border border-slate-700 space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="font-mono text-slate-200 font-bold">Primary Storage</span>
                   <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-mono">backend/backups/</span>
@@ -649,7 +661,7 @@ export function PresentationDeck() {
                 <p className="text-[11px] text-slate-400">Local fast-path recovery for operational admins</p>
               </div>
 
-              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 space-y-1">
+              <div className="p-3 bg-slate-800/80 border border-slate-700 space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="font-mono text-slate-200 font-bold">Secondary Mirror</span>
                   <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono">/tmp/veritas_secondary_mirror/</span>
@@ -657,7 +669,7 @@ export function PresentationDeck() {
                 <p className="text-[11px] text-slate-400">Isolated secondary destination immune to primary path corruption</p>
               </div>
 
-              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 space-y-1">
+              <div className="p-3 bg-slate-800/80 border border-slate-700 space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="font-mono text-slate-200 font-bold">Offsite Browser Upload</span>
                   <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono">REST API Import</span>
@@ -680,41 +692,47 @@ export function PresentationDeck() {
         "Security and identity management are paramount. We implemented strict RFC email validation that rejects disposable domains and single-character labels such as 'g.com'. For email dispatch, we use Gmail SMTP over STARTTLS with envelope MAIL FROM extraction. We also engineered a self-service password recovery flow with a 30-second cooldown rate limit, 5-attempt brute-force protection, and automatic session cleanup.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 h-full items-stretch">
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center font-bold">
-              <Mail className="w-4 h-4" />
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-900/50 text-rose-300 flex items-center justify-center font-bold border border-rose-500/40">
+                <Mail className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-white text-sm">Strict RFC Email Validation</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Regex and domain parser reject disposable email providers, consecutive periods, and nonsense single-letter domains (e.g. <code className="font-mono text-rose-300 bg-rose-900/50 px-1 py-0.5 rounded border border-rose-500/40">yd@g.com</code>).
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Strict RFC Email Validation</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Regex and domain parser reject disposable email providers, consecutive periods, and nonsense single-letter domains (e.g. <code className="font-mono text-rose-600 bg-rose-50 px-1 py-0.5 rounded">yd@g.com</code>).
-            </p>
-            <div className="p-2 bg-rose-50 rounded-lg text-[10px] font-mono text-rose-800">
+            <div className="p-2 bg-rose-950/60 rounded-lg text-[10px] font-mono text-rose-300 border border-rose-500/30">
               Disallows: mailinator, tempmail, fake TLDs
             </div>
           </div>
 
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-              <Server className="w-4 h-4" />
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-900/50 text-blue-300 flex items-center justify-center font-bold border border-blue-500/40">
+                <Server className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-white text-sm">Gmail SMTP & Non-blocking I/O</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Native SMTP delivery over STARTTLS port 587 with envelope sender extraction. Dispatched via <code className="font-mono text-[10px] bg-slate-700/60 text-blue-300 px-1 py-0.5 rounded border border-blue-500/30">asyncio.to_thread</code> to maintain sub-second event loop response times.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Gmail SMTP & Non-blocking I/O</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Native SMTP delivery over STARTTLS port 587 with envelope sender extraction. Dispatched via <code className="font-mono text-[10px]">asyncio.to_thread</code> to maintain sub-second event loop response times.
-            </p>
-            <div className="p-2 bg-blue-50 rounded-lg text-[10px] font-mono text-blue-800">
+            <div className="p-2 bg-blue-950/60 rounded-lg text-[10px] font-mono text-blue-300 border border-blue-500/30">
               Fallback: Dev OTP logging prevents demo blockage
             </div>
           </div>
 
-          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-              <Key className="w-4 h-4" />
+          <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-900/50 text-emerald-300 flex items-center justify-center font-bold border border-emerald-500/40">
+                <Key className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-white text-sm">Self-Service OTP Recovery</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Users who forget credentials can request a 6-digit recovery PIN. Features a 30-second cooldown rate limit, 5-attempt brute-force threshold, and immediate invalidation on password reset.
+              </p>
             </div>
-            <h4 className="font-bold text-slate-900 text-sm">Self-Service OTP Recovery</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Users who forget credentials can request a 6-digit recovery PIN. Features a 30-second cooldown rate limit, 5-attempt brute-force threshold, and immediate invalidation on password reset.
-            </p>
-            <div className="p-2 bg-emerald-50 rounded-lg text-[10px] font-mono text-emerald-800">
+            <div className="p-2 bg-emerald-950/60 rounded-lg text-[10px] font-mono text-emerald-300 border border-emerald-500/30">
               Security: PBKDF2 / Bcrypt password hashing
             </div>
           </div>
@@ -734,33 +752,33 @@ export function PresentationDeck() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1">
-                <span className="text-3xl font-black text-emerald-700 font-mono">93.4%</span>
-                <span className="text-xs font-bold text-slate-700 block">Ensemble Accuracy</span>
-                <span className="text-[10px] text-slate-500 block">ISOT / LIAR-PLUS holdout</span>
+              <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl text-center space-y-1">
+                <span className="text-3xl font-black text-emerald-400 font-mono">93.4%</span>
+                <span className="text-xs font-bold text-white block">Ensemble Accuracy</span>
+                <span className="text-[10px] text-slate-400 block">ISOT / LIAR-PLUS holdout</span>
               </div>
 
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-center space-y-1">
-                <span className="text-3xl font-black text-blue-700 font-mono">0.928</span>
-                <span className="text-xs font-bold text-slate-700 block">Macro F1 Score</span>
-                <span className="text-[10px] text-slate-500 block">+11.6% vs pure LLM</span>
+              <div className="p-4 bg-blue-950/40 border border-blue-500/30 rounded-2xl text-center space-y-1">
+                <span className="text-3xl font-black text-blue-400 font-mono">0.928</span>
+                <span className="text-xs font-bold text-white block">Macro F1 Score</span>
+                <span className="text-[10px] text-slate-400 block">+11.6% vs pure LLM</span>
               </div>
 
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl text-center space-y-1">
-                <span className="text-3xl font-black text-purple-700 font-mono">680ms</span>
-                <span className="text-xs font-bold text-slate-700 block">Mean End-to-End Latency</span>
-                <span className="text-[10px] text-slate-500 block">FastAPI Async Pipeline</span>
+              <div className="p-4 bg-purple-950/40 border border-purple-500/30 rounded-2xl text-center space-y-1">
+                <span className="text-3xl font-black text-purple-400 font-mono">680ms</span>
+                <span className="text-xs font-bold text-white block">Mean End-to-End Latency</span>
+                <span className="text-[10px] text-slate-400 block">FastAPI Async Pipeline</span>
               </div>
 
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-1">
-                <span className="text-3xl font-black text-amber-700 font-mono">-88.5%</span>
-                <span className="text-xs font-bold text-slate-700 block">False Positive Reduction</span>
-                <span className="text-[10px] text-slate-500 block">Via Semantic Pillar Binding</span>
+              <div className="p-4 bg-amber-950/40 border border-amber-500/30 rounded-2xl text-center space-y-1">
+                <span className="text-3xl font-black text-amber-400 font-mono">-88.5%</span>
+                <span className="text-xs font-bold text-white block">False Positive Reduction</span>
+                <span className="text-[10px] text-slate-400 block">Via Semantic Pillar Binding</span>
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600 leading-relaxed">
-              <strong>User Experience Evaluation:</strong> Institutional tests conducted with journalism faculty confirmed that users overwhelmingly prefer VeritasAI&apos;s 4-dimensional breakdown over opaque single confidence scores.
+            <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl text-xs text-slate-300 leading-relaxed">
+              <strong className="text-white">User Experience Evaluation:</strong> Institutional tests conducted with journalism faculty confirmed that users overwhelmingly prefer VeritasAI&apos;s 4-dimensional breakdown over opaque single confidence scores.
             </div>
           </div>
 
@@ -823,39 +841,39 @@ export function PresentationDeck() {
       content: (
         <div className="space-y-6 h-full flex flex-col justify-between">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="p-5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+            <div className="p-5 bg-blue-950/30 border border-blue-500/30 rounded-2xl space-y-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
                 1
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Multimodal Ensemble Fusion</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h4 className="font-bold text-white text-sm">Multimodal Ensemble Fusion</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Replaces unreliable single-model classifiers with an explainable 4-dimensional synthesis of linguistic transformer attention, stylometrics, wire corroboration, and publisher domain health.
               </p>
             </div>
 
-            <div className="p-5 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">
+            <div className="p-5 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl space-y-2">
               <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
                 2
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Deterministic Provenance</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h4 className="font-bold text-white text-sm">Deterministic Provenance</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Generates HMAC-SHA256 tamper-evident digital audit certificates enabling journalists, academic researchers, and legal counsel to verify when and how an article was analyzed.
               </p>
             </div>
 
-            <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+            <div className="p-5 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl space-y-2">
               <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
                 3
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Enterprise Operational Hardening</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h4 className="font-bold text-white text-sm">Enterprise Operational Hardening</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Engineered automated dual-backup snapshot engine, retention pruning, self-service OTP recovery, and background continuous training loops.
               </p>
             </div>
           </div>
 
-          <div className="p-8 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl text-center space-y-4 shadow-xl">
-            <h3 className="text-2xl font-black tracking-tight">
+          <div className="p-8 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl text-center space-y-4 shadow-xl border border-slate-800">
+            <h3 className="text-2xl font-black tracking-tight text-white">
               Thank You Respected Examiners
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
@@ -1017,18 +1035,20 @@ export function PresentationDeck() {
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="w-full max-w-6xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md space-y-6"
           >
-            {/* Slide Header */}
-            <div className="space-y-1">
-              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-blue-400 block">
-                {current.badge}
-              </span>
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
-                {current.title}
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400">
-                {current.subtitle}
-              </p>
-            </div>
+            {/* Slide Header (Slides 2-12) */}
+            {current.id !== 1 && (
+              <div className="space-y-1">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-blue-400 block">
+                  {current.badge}
+                </span>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
+                  {current.title}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-400">
+                  {current.subtitle}
+                </p>
+              </div>
+            )}
 
             {/* Slide Interactive Content */}
             <div className="pt-2">

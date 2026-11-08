@@ -14,7 +14,6 @@ import {
   X,
   LayoutDashboard,
   Zap,
-  Presentation,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import {
@@ -129,16 +128,6 @@ export function Header() {
                   {isSuperAdmin ? 'Super Admin' : 'Admin Console'}
                 </Link>
               )}
-
-              <Link
-                to="/presentation"
-                className={`inline-flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-indigo-600 ${
-                  location.pathname === '/presentation' ? 'text-indigo-600 font-bold' : 'text-slate-600'
-                }`}
-              >
-                <Presentation className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Defense Slides</span>
-              </Link>
             </nav>
 
             {/* User Profile / Auth Actions */}
@@ -306,13 +295,6 @@ export function Header() {
                 {isSuperAdmin ? 'Super Admin Console' : 'Admin Console'}
               </Link>
             )}
-            <Link
-              to="/presentation"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block text-sm font-medium text-indigo-700 font-bold py-1.5"
-            >
-              Defense Slides
-            </Link>
 
             <div className="pt-3 border-t border-slate-100">
               {isLoggedIn ? (

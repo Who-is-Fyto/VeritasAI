@@ -105,12 +105,16 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
 
 export const router = createBrowserRouter([
   {
+    path: "/presentation",
+    Component: PresentationDeck,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: "/",
     Component: Root,
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, Component: Home },
-      { path: "presentation", Component: PresentationDeck },
       { path: "login", Component: Login },
       { path: "signup", Component: Signup },
       { 

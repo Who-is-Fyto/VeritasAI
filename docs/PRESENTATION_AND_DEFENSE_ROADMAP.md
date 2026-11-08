@@ -59,5 +59,11 @@ Status: Completed (Production Build Verified)
   - Smooth Framer Motion transitions, interactive architecture cards, keyboard shortcuts (Arrow keys, Spacebar, Home, End, Fullscreen toggle with F).
   - Built-in speaker notes toggleable drawer displaying speech cues during rehearsal and delivery.
   - Direct links to launch the live verification demo and superadmin console.
-- [x] **Platform Navigation Integration**:
-  - Linked Defense Slides in top header desktop and mobile menus, and in platform footer.
+- [x] **Standalone Presentation Route & Distraction-Free Layout**:
+  - Extracted `/presentation` out of `Root` layout in `src/app/routes.tsx` to provide a clean full-screen presentation experience without the global application navbar and footer.
+  - Removed defense slides button from the main application `Header.tsx` to keep the deck accessible directly via URL.
+- [x] **Executive High-Contrast Dark Theme Styling**:
+  - Re-engineered all 12 slides in `src/app/components/PresentationDeck.tsx` with crisp executive contrast against `bg-slate-950` and `bg-slate-900/90`.
+  - Replaced low-contrast `text-slate-900` and `text-slate-600` styling with `text-white` headings, `text-slate-300` body copy, and vibrant accent highlights (`text-blue-400`, `text-emerald-400`, `text-amber-400`, `text-purple-400`).
+  - Upgraded card containers to high-contrast dark surfaces with tinted borders (`bg-slate-800/80`, `bg-rose-950/30`, `bg-amber-950/30`, `bg-blue-950/30`, `bg-emerald-950/30`).
+  - Omitted redundant duplicate header on Slide 1 so the dissertation title, candidate profile, and flagship architecture card have maximum visual impact.

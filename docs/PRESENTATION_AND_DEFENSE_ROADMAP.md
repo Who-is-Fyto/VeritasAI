@@ -47,13 +47,10 @@ Status: Completed (All Tests Passed)
 Status: Completed (Production Build Verified)
 
 ### Objectives:
-- [x] **Formal Examiner Presentation Speech**:
-  - Created `docs/EXAMINER_PRESENTATION_SPEECH.md` containing a timed academic defense script (10–12 minutes) covering:
-    1. Problem Statement & Motivation (The Generative AI Infodemic & Sybil Disinformation).
-    2. Architecture & Technical Novelty (RoBERTa Forensic Stylometrics, 100+ Source Authority Registry, Semantic Pillar Binding Corroboration).
-    3. Security & Governance (PoLP RBAC, Break-Glass Root Admin, Gmail SMTP 2FA, 3-2-1 Automated Disaster Recovery).
-    4. Database Topology & MongoDB TTL Collections.
-    5. Anticipated Examiner Defense Questions & Authoritative Answers.
+- [x] **Clear & Conversational English Edition (Speech & In-Slide Notes)**:
+  - Rewrote `docs/EXAMINER_PRESENTATION_SPEECH.md` into accessible, clear college-level English, stripping out dense academic jargon and replacing tongue-twisters with punchy real-world explanations.
+  - Updated all 12 in-slide `speakerNotes` in `src/app/components/PresentationDeck.tsx` so clicking "Notes" displays natural, easy-to-read speaking cues.
+  - Added a plain-English Examiner Q&A Cheat Sheet answering tough questions (Why MongoDB? The alien attack bug, 3-2-1 backup details, and difference from ChatGPT) in confident, simple terms.
 - [x] **Interactive Animated Slide Deck (`/presentation` Route)**:
   - Created `src/app/components/PresentationDeck.tsx` with 12 comprehensive academic slides.
   - Smooth Framer Motion transitions, interactive architecture cards, keyboard shortcuts (Arrow keys, Spacebar, Home, End, Fullscreen toggle with F).

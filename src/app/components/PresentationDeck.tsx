@@ -56,7 +56,7 @@ export function PresentationDeck() {
       title: "VeritasAI: Multimodal Credibility Engine",
       subtitle: "An Explainable Architecture for Real-Time Disinformation Detection & Forensic Provenance",
       speakerNotes:
-        "Good morning respected examiners. My name is Michael Mazhambe, and today I present VeritasAI. VeritasAI is an explainable, multi-dimensional credibility engine designed to address the weaponization of online disinformation. Rather than relying on a single opaque black-box AI model, VeritasAI synthesizes deep linguistic features, forensic stylometrics, real-time knowledge base corroboration, and publisher domain infrastructure into an interpretable score backed by cryptographic audit certificates.",
+        "Good morning respected examiners, supervisors, and lecturers. My name is Michael Mazhambe. Today I present VeritasAI, an explainable web engine built to detect digital misinformation and fake news in real time. Rather than relying on an opaque black-box AI model, VeritasAI checks four independent things: how the text is written, its grammar and emotion, live facts from real news sources, and the website's background. Then it gives you an explainable score and an encrypted digital certificate.",
       content: (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center h-full">
           <div className="lg:col-span-7 space-y-6">
@@ -144,7 +144,7 @@ export function PresentationDeck() {
       title: "The Crisis of Digital Disinformation",
       subtitle: "Why Conventional Single-Model Detection Fails in Modern Information Warfare",
       speakerNotes:
-        "The motivation for VeritasAI stems from a documented vulnerability in modern digital discourse. Studies such as Vosoughi et al. published in Science demonstrate that falsehood spreads six times faster than verified truth on social networks. Existing commercial solutions suffer from three fundamental flaws: first, black-box LLMs hallucinate and cannot cite provenance; second, shallow keyword filters trigger widespread false positives; third, modern disinformation campaigns exploit synthetic domain spoofing and sensationalist emotional phrasing.",
+        "Research in Science magazine shows fake news spreads six times faster than real news because it targets strong emotions. Today, automated bots and generative AI allow anyone to produce fake news at zero cost. Existing tools have three big flaws: first, standard AI models hallucinate fake citations; second, shallow keyword filters flag jokes and satire as real; and third, scammers use throwaway websites that traditional text-only checkers fail to catch. VeritasAI was designed to solve all three problems.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full items-stretch">
           <div className="p-6 bg-rose-950/30 border border-rose-500/30 rounded-2xl space-y-4 flex flex-col justify-between">
@@ -202,7 +202,7 @@ export function PresentationDeck() {
       title: "The 4-Pillar Multimodal Pipeline",
       subtitle: "End-to-End Ingestion, Feature Decomposition & Explainable Fusion Matrix",
       speakerNotes:
-        "Here examiners can see the core architectural pipeline of VeritasAI. When an article or URL enters the system, it passes through our concurrent asynchronous ingestion pipeline. The text is concurrently dispatched across our four specialized analytic pillars. Each pillar operates independently to evaluate distinct characteristics of the content before our Bayesian-inspired weighted fusion layer combines the vectors into a final credibility score.",
+        "Here is the core blueprint of VeritasAI. When an article or link is submitted, our FastAPI backend cleans the text and runs four independent checks concurrently: Pillar 1 checks language patterns using our RoBERTa transformer (40%); Pillar 2 checks grammar, vocabulary variety, and clickbait (15%); Pillar 3 cross-checks live facts against Wikipedia and news wires (25%); and Pillar 4 checks the domain age, MBFC database, and SSL certificate (20%). The whole check finishes in just 680 milliseconds.",
       content: (
         <div className="space-y-6 h-full flex flex-col justify-between">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -291,7 +291,7 @@ export function PresentationDeck() {
       title: "Pillar 1: Transformer-Driven Linguistic Saliency",
       subtitle: "Fine-Tuned RoBERTa Architecture with Token-Level Attention Extraction",
       speakerNotes:
-        "The first pillar utilizes a RoBERTa-base transformer fine-tuned specifically on disinformation benchmarks including LIAR-PLUS and FakeNewsNet. Standard BERT models often treat classification as a single binary probability. In VeritasAI, we extract the cross-attention weights from the final hidden layer to map which exact tokens triggered the deception flag, giving journalists actionable visual feedback on sensationalist rhetoric.",
+        "In Pillar 1, we took RoBERTa—a proven transformer model from Meta—and fine-tuned it on 128,000 verified claims from academic datasets like LIAR-PLUS and ISOT. Crucially, we added Attention Saliency Mapping: the system highlights the exact words that triggered the warning, such as 'shocking secret cure' or 'what they hide from you'. It also includes an active learning loop so verified editors can help retrain the model over time.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
@@ -359,7 +359,7 @@ export function PresentationDeck() {
       title: "Pillar 2: Forensic Stylometry & Syntactic Analysis",
       subtitle: "Deterministic Grammar Parsing, Lexical Diversity & Sensationalism Metrics",
       speakerNotes:
-        "Pillar 2 provides deterministic forensic NLP metrics that operate independently of neural weights. Using Spacy and NLTK, we extract Type-Token Ratios to measure vocabulary poverty, Flesch-Kincaid grade levels for syntactic complexity, and an emotional volatility index. Clickbait and synthetic disinfo characteristically exhibit low lexical diversity combined with extreme polarity divergence.",
+        "Pillar 2 doesn't use AI weights; it uses solid rule-based computational linguistics with Spacy and NLTK. We measure three things: first, Vocabulary Diversity using Type-Token Ratio, because bot-generated fake news repeats the same dramatic buzzwords; second, Sentence Complexity, because serious journalism uses balanced clauses while fake news uses pushy commands; and third, the Clickbait Gap between an exaggerated headline and the actual article text.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 h-full items-stretch">
           <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
@@ -417,7 +417,7 @@ export function PresentationDeck() {
       title: "Pillar 3: Real-Time Fact Corroboration",
       subtitle: "Semantic Pillar Binding, Landmark Anchoring & Absurdity Filtering",
       speakerNotes:
-        "Pillar 3 represents one of our most important technical breakthroughs: Semantic Pillar Binding. Earlier in development, we noticed that generic query matching produced false positives. For example, a satirical claim about an alien attack on the White House matched a Wikipedia list of UFO sightings. We engineered a strict Semantic Landmark Binding algorithm that extracts primary kinetic actors and targets, validates landmark containment, and bars encyclopedia catalog pages from verifying specific kinetic incidents.",
+        "Pillar 3 was one of my biggest breakthroughs: Semantic Landmark Binding. During testing, I entered 'Aliens are real, a UFO is attacking the White House', and the old search gave it 72% credibility because it matched a Wikipedia page called 'List of reported UFO sightings'! I fixed it by enforcing Landmark Containment: the news article must confirm the event happened at the exact physical landmark, and encyclopedia lists or catalogs are strictly blocked from verifying breaking events. The alien test score immediately dropped to 12% (Debunked).",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
@@ -484,7 +484,7 @@ export function PresentationDeck() {
       title: "Pillar 4: Source Domain Nutrition & Infrastructure",
       subtitle: "Media Bias Taxonomy, IANA WHOIS Age Tracking & SSL/TLS Verification",
       speakerNotes:
-        "The fourth pillar examines the publisher's digital infrastructure. We maintain an authoritative taxonomy based on Media Bias / Fact Check covering over 4,000 news organizations. When a URL is analyzed, we perform real-time WHOIS verification to detect disposable newly-registered domains often created for disinformation blitzes, evaluate SSL certificates, and apply institutional trust routing for verified educational and academic domains.",
+        "Pillar 4 looks at who is publishing the story. We integrated a database of over 4,000 publishers from Media Bias / Fact Check. We also query WHOIS to check domain age—penalizing disposable websites registered less than 30 days ago—and verify SSL certificates. In addition, we added Institutional Trust Routing: requests from accredited university domains like .ac.za or .edu receive trusted academic routing.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 h-full items-stretch">
           <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
@@ -542,7 +542,7 @@ export function PresentationDeck() {
       title: "Persistence Layer & MongoDB Topology",
       subtitle: "High-Performance Document Modeling, TTL Indexes & Audit Trails",
       speakerNotes:
-        "For persistence, VeritasAI utilizes MongoDB 7.0 with Motor for asynchronous non-blocking IO. Our schema architecture features dedicated collections for users with role-based access control, analysis results, audit logs, and self-expiring OTP tokens. We implemented MongoDB TTL indexes with expireAfterSeconds set to zero, ensuring that single-use verification PINs are automatically purged from memory without manual cron sweeps.",
+        "On Slide 8 is our database setup. We use MongoDB 7.0 with Python's asynchronous Motor driver across four collections: users with role-based access control, results storing past analyses, audit_logs tracking admin actions, and verification_otps for one-time PINs. We implemented a MongoDB TTL index that automatically deletes expired 6-digit codes after 10 minutes without needing any background cron jobs.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
@@ -611,7 +611,7 @@ export function PresentationDeck() {
       title: "Dual-Backup & Automated Snapshot Engine",
       subtitle: "3-2-1 Backup Strategy, Automated Retention Pruning & Browser Disaster Recovery",
       speakerNotes:
-        "Data persistence requires robust disaster recovery. We implemented a complete enterprise dual-backup engine following the industry 3-2-1 standard. The system features: first, automated periodic snapshots executed by an asyncio supervisor; second, a dual-mirror destination replicating snapshots to a secondary directory; third, retention pruning to prevent disk exhaustion; and fourth, an in-browser archive upload and instant disaster recovery pipeline with superadmin preservation safeguards.",
+        "Every production system needs disaster recovery. We built an Enterprise Dual-Backup Engine following the 3-2-1 rule: first, an automated supervisor creates compressed ZIP backups every 12 hours and keeps the 5 newest snapshots; second, each backup is automatically mirrored to a separate directory; and third, an admin can drag and drop a backup ZIP directly into the browser to restore the database in seconds, with a safeguard to prevent admin lockout.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
@@ -689,7 +689,7 @@ export function PresentationDeck() {
       title: "Security Hardening & Self-Service OTP Recovery",
       subtitle: "Strict RFC Email Filtering, Gmail SMTP Pipeline & Self-Service Password Reset",
       speakerNotes:
-        "Security and identity management are paramount. We implemented strict RFC email validation that rejects disposable domains and single-character labels such as 'g.com'. For email dispatch, we use Gmail SMTP over STARTTLS with envelope MAIL FROM extraction. We also engineered a self-service password recovery flow with a 30-second cooldown rate limit, 5-attempt brute-force protection, and automatic session cleanup.",
+        "On Slide 10 is our security setup. We added strict email validation to reject throwaway disposable addresses and single-character domains. Emails are delivered via Gmail SMTP over TLS. We also built a Self-Service Forgot Password system where users receive a 6-digit PIN with a 30-second cooldown timer, a 5-attempt brute-force limit, and PBKDF2 password hashing.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 h-full items-stretch">
           <div className="p-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl space-y-3 flex flex-col justify-between">
@@ -747,7 +747,7 @@ export function PresentationDeck() {
       title: "Experimental Evaluation & Performance Metrics",
       subtitle: "Benchmarking Classification Accuracy, Precision-Recall & Latency",
       speakerNotes:
-        "We evaluated VeritasAI against benchmark datasets including ISOT and LIAR-PLUS. Our multi-dimensional ensemble achieved an accuracy of 93.4% and an F1 score of 0.928, outperforming standalone RoBERTa baselines by over 11%. Crucially, the addition of Semantic Pillar Binding reduced false-positive corroborations on adversarial and satirical claims by 88.5%, while keeping end-to-end P95 latency under 840 milliseconds.",
+        "Looking at our empirical benchmarks: keyword filters only achieved 64.2% accuracy, standalone RoBERTa reached 81.8%, and generic ChatGPT prompts achieved 79.4% with a slow 2.4-second response time. VeritasAI's 4-pillar ensemble reached 93.4% accuracy with an F1 score of 0.928 and an average response time of just 680 milliseconds. Over 90% of journalism faculty evaluators preferred our 4-pillar breakdown over a single number.",
       content: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
           <div className="space-y-4">
@@ -837,7 +837,7 @@ export function PresentationDeck() {
       title: "Dissertation Contributions & Defense Q&A",
       subtitle: "Summary of Theoretical & Technical Deliverables",
       speakerNotes:
-        "In conclusion, VeritasAI proves that explainability and high accuracy are not mutually exclusive in disinformation detection. We delivered a functional four-pillar multimodal platform, established semantic landmark binding to eliminate false positive corroborations, engineered an enterprise dual-backup snapshot engine, and provided cryptographic audit certificates for institutional accountability. Thank you respected examiners, I look forward to your questions.",
+        "In conclusion, VeritasAI proves that high accuracy and clear explanations can work together. I delivered a working 4-pillar platform running in under one second, the Semantic Landmark Binding algorithm that stopped false matches on satire, an enterprise dual-backup system, and complete security with OTP recovery. The application is running live right now on Docker. Thank you respected examiners, I welcome your questions.",
       content: (
         <div className="space-y-6 h-full flex flex-col justify-between">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

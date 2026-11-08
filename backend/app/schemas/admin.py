@@ -105,6 +105,8 @@ class BackupMetadata(BaseModel):
     total_documents: int
     checksum_sha256: Optional[str] = None
     status: str = "completed"
+    backup_type: str = "manual"  # "manual" | "automated" | "imported"
+    mirrored: bool = False
 
 
 class BackupListResponse(BaseModel):
@@ -112,6 +114,10 @@ class BackupListResponse(BaseModel):
     total: int
     total_size_bytes: int
     total_size_formatted: str
+    auto_backup_enabled: bool = True
+    auto_backup_interval_hours: int = 12
+    secondary_mirror_active: bool = False
+    next_scheduled_backup: Optional[datetime] = None
 
 
 class RestoreRequest(BaseModel):

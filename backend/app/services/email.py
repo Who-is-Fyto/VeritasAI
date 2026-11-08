@@ -16,12 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 def build_otp_html(otp: str, purpose: str = "signup") -> str:
-    action_label = "Account Registration" if purpose == "signup" else "Sign-in Authorization"
-    action_desc = (
-        "Thank you for registering with VeritasAI. To verify your email and activate your account, please enter the one-time PIN below:"
-        if purpose == "signup"
-        else "A sign-in request was initiated for your VeritasAI account. Please enter the one-time PIN below to verify your identity:"
-    )
+    if purpose == "signup":
+        action_label = "Account Registration"
+        action_desc = "Thank you for registering with VeritasAI. To verify your email and activate your account, please enter the one-time PIN below:"
+    elif purpose == "forgot_password":
+        action_label = "Password Recovery"
+        action_desc = "A password reset request was initiated for your VeritasAI account. To verify your identity and set a new password, please enter the one-time PIN below:"
+    else:
+        action_label = "Sign-in Authorization"
+        action_desc = "A sign-in request was initiated for your VeritasAI account. Please enter the one-time PIN below to verify your identity:"
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -154,15 +157,20 @@ async def send_otp_email(to_email: str, otp: str, purpose: str = "signup") -> bo
     to the server console so tests and offline presentations are never disrupted.
     """
     clean_email = to_email.strip().lower()
-    subject = (
-        f"VeritasAI Verification Code: {otp}"
-        if purpose == "signup"
-        else f"VeritasAI Sign-in Code: {otp}"
-    )
+    if purpose == "signup":
+        subject = f"VeritasAI Verification Code: {otp}"
+        action_name = "Account Registration"
+    elif purpose == "forgot_password":
+        subject = f"VeritasAI Password Reset Code: {otp}"
+        action_name = "Password Recovery"
+    else:
+        subject = f"VeritasAI Sign-in Code: {otp}"
+        action_name = "Sign-in Authorization"
+
     html_content = build_otp_html(otp, purpose)
     plain_text = (
         f"VeritasAI One-Time Verification PIN: {otp}\n"
-        f"Action: {'Account Registration' if purpose == 'signup' else 'Sign-in Authorization'}\n"
+        f"Action: {action_name}\n"
         f"Valid for 10 minutes. If you did not initiate this request, ignore this message."
     )
 

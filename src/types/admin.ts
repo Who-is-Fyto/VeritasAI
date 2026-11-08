@@ -82,6 +82,8 @@ export interface BackupMetadata {
   total_documents: number;
   checksum_sha256?: string;
   status: "completed" | "in_progress" | "failed";
+  backup_type?: "manual" | "automated" | "imported";
+  mirrored?: boolean;
 }
 
 export interface BackupListResponse {
@@ -89,6 +91,10 @@ export interface BackupListResponse {
   total: number;
   total_size_bytes: number;
   total_size_formatted: string;
+  auto_backup_enabled?: boolean;
+  auto_backup_interval_hours?: number;
+  secondary_mirror_active?: boolean;
+  next_scheduled_backup?: string | null;
 }
 
 export interface RestoreResponse {

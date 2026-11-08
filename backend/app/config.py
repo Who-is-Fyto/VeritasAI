@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_minute: int = 10
 
+    # Database Backup & Disaster Recovery
+    backup_auto_enabled: bool = True
+    backup_auto_interval_hours: int = 12
+    backup_auto_retention_count: int = 5
+    backup_secondary_dir: str = "/tmp/veritas_secondary_mirror"
 
     # Scoring weights — must sum to 1.0
     weight_linguistic: float = 0.40

@@ -25,7 +25,9 @@ interface AuthContextType {
   loginVerifyOtp: (email: string, otp: string) => Promise<void>;
   signupRequestOtp: (payload: any) => Promise<{ status: string; message: string; email: string; dev_otp?: string | null }>;
   signupVerifyOtp: (email: string, otp: string) => Promise<void>;
-  resendOtp: (email: string, purpose: "signup" | "login") => Promise<{ status: string; message: string; dev_otp?: string | null }>;
+  resendOtp: (email: string, purpose: "signup" | "login" | "forgot_password") => Promise<{ status: string; message: string; dev_otp?: string | null }>;
+  forgotPasswordRequestOtp: (email: string) => Promise<{ status: string; message: string; email: string; dev_otp?: string | null }>;
+  forgotPasswordReset: (email: string, otp: string, newPassword: string) => Promise<{ status: string; message: string }>;
   register: (payload: any) => Promise<void>;
   updateProfile: (payload: any) => Promise<void>;
   changeTier: (tier: AccountTier) => Promise<void>;
@@ -164,8 +166,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resendOtp = async (email: string, purpose: "signup" | "login") => {
+  const resendOtp = async (email: string, purpose: "signup" | "login" | "forgot_password") => {
     return await veritasAPI.resendOtp(email, purpose);
+  };
+
+  const forgotPasswordRequestOtp = async (email: string) => {
+    return await veritasAPI.forgotPasswordRequestOtp(email);
+  };
+
+  const forgotPasswordReset = async (email: string, otp: string, newPassword: string) => {
+    return await veritasAPI.forgotPasswordReset(email, otp, newPassword);
   };
 
   const register = async (payload: any) => {
@@ -275,6 +285,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signupRequestOtp,
         signupVerifyOtp,
         resendOtp,
+        forgotPasswordRequestOtp,
+        forgotPasswordReset,
         register,
         updateProfile,
         changeTier,

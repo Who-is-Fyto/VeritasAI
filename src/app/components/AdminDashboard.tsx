@@ -38,6 +38,7 @@ import {
   FileArchive,
   FolderDown,
   FileCheck2,
+  Upload,
 } from "lucide-react";
 
 import { veritasAPI } from "../../services/api";
@@ -87,6 +88,18 @@ export function AdminDashboard() {
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backupCreating, setBackupCreating] = useState(false);
   const [downloadingFilename, setDownloadingFilename] = useState<string | null>(null);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
+  const [autoBackupIntervalHours, setAutoBackupIntervalHours] = useState(12);
+  const [secondaryMirrorActive, setSecondaryMirrorActive] = useState(false);
+  const [nextScheduledBackup, setNextScheduledBackup] = useState<string | null>(null);
+
+  // Upload Backup Modal state
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<"archive_only" | "instant_restore">("archive_only");
+  const [uploadRestoreConfirmation, setUploadRestoreConfirmation] = useState("");
+  const [uploadDropExisting, setUploadDropExisting] = useState(true);
+  const [uploadLoading, setUploadLoading] = useState(false);
 
   // Restore Modal state
   const [restoreModalBackup, setRestoreModalBackup] = useState<BackupMetadata | null>(null);
@@ -174,6 +187,10 @@ export function AdminDashboard() {
       setBackups(res.backups);
       setBackupsTotal(res.total);
       setBackupsTotalSize(res.total_size_formatted);
+      if (res.auto_backup_enabled !== undefined) setAutoBackupEnabled(res.auto_backup_enabled);
+      if (res.auto_backup_interval_hours !== undefined) setAutoBackupIntervalHours(res.auto_backup_interval_hours);
+      if (res.secondary_mirror_active !== undefined) setSecondaryMirrorActive(res.secondary_mirror_active);
+      if (res.next_scheduled_backup !== undefined) setNextScheduledBackup(res.next_scheduled_backup);
     } catch (err: any) {
       toast.error("Backups failed: " + (err.message || "Could not retrieve backup snapshots"));
     } finally {
@@ -337,6 +354,41 @@ export function AdminDashboard() {
       toast.error("Delete failed: " + (err.message || "Could not delete backup snapshot"));
     } finally {
       setDeleteBackupLoading(false);
+    }
+  };
+
+  const handleUploadBackupSubmit = async () => {
+    if (!uploadFile) {
+      toast.error("Please select a .zip backup archive to upload.");
+      return;
+    }
+    try {
+      setUploadLoading(true);
+      if (uploadMode === "instant_restore") {
+        if (uploadRestoreConfirmation.trim().toUpperCase() !== "RESTORE") {
+          toast.error("Confirmation mismatch. You must type 'RESTORE' to execute disaster recovery.");
+          return;
+        }
+        const res = await veritasAPI.adminUploadAndRestoreBackup(
+          uploadFile,
+          uploadRestoreConfirmation,
+          uploadDropExisting
+        );
+        toast.success(res.message || "Database restored successfully from uploaded archive.");
+      } else {
+        const meta = await veritasAPI.adminUploadBackup(uploadFile);
+        toast.success(`Backup archive '${meta.filename}' uploaded and registered.`);
+      }
+      setUploadModalOpen(false);
+      setUploadFile(null);
+      setUploadRestoreConfirmation("");
+      fetchBackups();
+      fetchAuditLogs();
+      fetchTelemetry();
+    } catch (err: any) {
+      toast.error("Backup operation failed: " + (err.message || "Failed to process uploaded archive"));
+    } finally {
+      setUploadLoading(false);
     }
   };
 
@@ -895,15 +947,63 @@ export function AdminDashboard() {
                   </div>
 
                   {isSuperAdmin && (
-                    <button
-                      onClick={handleCreateBackup}
-                      disabled={backupCreating}
-                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${backupCreating ? "animate-spin" : ""}`} />
-                      <span>{backupCreating ? "Creating Snapshot..." : "Create System Backup"}</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          setUploadFile(null);
+                          setUploadMode("archive_only");
+                          setUploadRestoreConfirmation("");
+                          setUploadModalOpen(true);
+                        }}
+                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Upload Archive</span>
+                      </button>
+
+                      <button
+                        onClick={handleCreateBackup}
+                        disabled={backupCreating}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${backupCreating ? "animate-spin" : ""}`} />
+                        <span>{backupCreating ? "Creating Snapshot..." : "Create System Backup"}</span>
+                      </button>
+                    </>
                   )}
+                </div>
+              </div>
+
+              {/* Dual-Backup & Snapshot Engine Status Strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${autoBackupEnabled ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-800">Automated Snapshots</p>
+                    <p className="text-slate-500 text-[11px]">
+                      {autoBackupEnabled ? `Active: Every ${autoBackupIntervalHours}h` : "Disabled"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${secondaryMirrorActive ? "bg-blue-500" : "bg-amber-500"}`} />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-800">Secondary Storage Mirror</p>
+                    <p className="text-slate-500 text-[11px]">
+                      {secondaryMirrorActive ? "Active (Dual-destination)" : "Primary storage only"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center gap-3">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-800">Next Scheduled Snapshot</p>
+                    <p className="text-slate-500 text-[11px]">
+                      {nextScheduledBackup ? new Date(nextScheduledBackup).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }) : "On demand"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -967,11 +1067,12 @@ export function AdminDashboard() {
                     <thead>
                       <tr className="bg-slate-50/75 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         <th className="py-3 px-4">Snapshot Archive</th>
+                        <th className="py-3 px-4">Type</th>
                         <th className="py-3 px-4">Created Timestamp</th>
                         <th className="py-3 px-4">Archive Size</th>
                         <th className="py-3 px-4">Collections Breakdown</th>
                         <th className="py-3 px-4">Total Records</th>
-                        <th className="py-3 px-4">Integrity</th>
+                        <th className="py-3 px-4">Redundancy</th>
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -992,6 +1093,24 @@ export function AdminDashboard() {
                                 )}
                               </div>
                             </div>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {b.backup_type === "automated" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                <RefreshCw className="w-2.5 h-2.5" />
+                                Automated
+                              </span>
+                            ) : b.backup_type === "imported" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <Upload className="w-2.5 h-2.5" />
+                                Imported
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                <HardDrive className="w-2.5 h-2.5" />
+                                Manual
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
@@ -1021,10 +1140,17 @@ export function AdminDashboard() {
                             {b.total_documents.toLocaleString()} docs
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <FileCheck2 className="w-3 h-3 text-emerald-600" />
-                              <span>Verified BSON</span>
-                            </span>
+                            {b.mirrored ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Synchronised with secondary mirror storage">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Dual-Mirrored</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200" title="Stored in primary backup ledger">
+                                <FileCheck2 className="w-3 h-3 text-slate-500" />
+                                <span>Primary Ledger</span>
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             {isSuperAdmin ? (
@@ -1426,6 +1552,171 @@ export function AdminDashboard() {
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {deleteBackupLoading ? "Deleting..." : "Permanently Delete Archive"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload Backup Archive / Instant Restore Modal */}
+      <AnimatePresence>
+        {uploadModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-xl border border-slate-200 space-y-4"
+            >
+              <div className="flex items-center gap-2.5 text-slate-900">
+                <Upload className="w-5 h-5 text-amber-500" />
+                <h3 className="font-bold text-slate-900 text-base">Import Backup Archive</h3>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Upload an offsite <code className="font-mono text-amber-700 bg-amber-50 px-1 py-0.5 rounded">.zip</code> database archive to register it in the system ledger or execute immediate disaster recovery.
+              </p>
+
+              {/* File Selector */}
+              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center space-y-2 hover:border-amber-400 transition-colors">
+                <FileArchive className="w-8 h-8 text-slate-400 mx-auto" />
+                <input
+                  type="file"
+                  id="backup-file-input"
+                  accept=".zip"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setUploadFile(f);
+                  }}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="backup-file-input"
+                  className="inline-block px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg cursor-pointer transition-colors"
+                >
+                  Choose .zip Archive
+                </label>
+                {uploadFile ? (
+                  <p className="text-xs font-mono font-bold text-emerald-700">
+                    Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Max size: 100 MB. Must contain a valid manifest.json.
+                  </p>
+                )}
+              </div>
+
+              {/* Mode Selection */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  Import Action Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode("archive_only")}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      uploadMode === "archive_only"
+                        ? "border-amber-500 bg-amber-50/50 ring-1 ring-amber-500"
+                        : "border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-slate-900">Upload to Ledger</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Store in archive ledger for later manual restoration.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode("instant_restore")}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      uploadMode === "instant_restore"
+                        ? "border-rose-500 bg-rose-50/50 ring-1 ring-rose-500"
+                        : "border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-rose-900">Instant Restore</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Immediately overwrite database from archive.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Instant Restore Safeguard Section */}
+              {uploadMode === "instant_restore" && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2.5">
+                  <div className="flex items-start gap-2 text-xs text-rose-900">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-rose-800">Critical Disaster Recovery Warning</p>
+                      <p className="text-rose-700 leading-relaxed text-[11px]">
+                        This operation replaces current collection documents with records from the uploaded archive. Superadmin accounts remain preserved.
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={uploadDropExisting}
+                      onChange={(e) => setUploadDropExisting(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-[11px]">Drop existing collections before import (eliminates duplicate key errors)</span>
+                  </label>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-rose-900">
+                      Type <span className="font-mono text-rose-700">RESTORE</span> to authorize instant disaster recovery:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="RESTORE"
+                      value={uploadRestoreConfirmation}
+                      onChange={(e) => setUploadRestoreConfirmation(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-rose-300 font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 uppercase tracking-widest bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadModalOpen(false);
+                    setUploadFile(null);
+                    setUploadRestoreConfirmation("");
+                  }}
+                  disabled={uploadLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUploadBackupSubmit}
+                  disabled={
+                    !uploadFile ||
+                    uploadLoading ||
+                    (uploadMode === "instant_restore" && uploadRestoreConfirmation.trim().toUpperCase() !== "RESTORE")
+                  }
+                  className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs cursor-pointer disabled:opacity-40 flex items-center gap-1.5 ${
+                    uploadMode === "instant_restore" ? "bg-rose-600 hover:bg-rose-700" : "bg-amber-600 hover:bg-amber-700"
+                  }`}
+                >
+                  <Upload className={`w-3.5 h-3.5 ${uploadLoading ? "animate-bounce" : ""}`} />
+                  <span>
+                    {uploadLoading
+                      ? "Processing Archive..."
+                      : uploadMode === "instant_restore"
+                      ? "Upload & Execute Restore"
+                      : "Upload Archive"}
+                  </span>
                 </button>
               </div>
             </motion.div>

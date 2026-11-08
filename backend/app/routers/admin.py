@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -768,4 +768,113 @@ async def delete_backup(
         ip_address=client_ip
     )
     return {"status": "success", "message": f"Backup archive '{filename}' deleted successfully."}
+
+
+@router.post(
+    "/backups/upload",
+    response_model=BackupMetadata,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload and register an external backup zip archive"
+)
+async def upload_backup(
+    req: Request,
+    file: UploadFile = File(...),
+    current_admin: UserResponse = Depends(require_superadmin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> BackupMetadata:
+    if not file.filename or not file.filename.endswith(".zip"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file must be a valid '.zip' archive."
+        )
+
+    # 100 MB max size safeguard
+    contents = await file.read()
+    if len(contents) > 100 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Backup archive exceeds maximum allowable upload size of 100 MB."
+        )
+
+    meta = await backup_service.import_backup_archive(contents, file.filename)
+    client_ip = req.client.host if req.client else None
+    await log_audit_event(
+        db,
+        actor_id=current_admin.id,
+        actor_email=current_admin.email,
+        action="DATABASE_BACKUP_IMPORTED",
+        target_id=meta.backup_id,
+        target_type="backup",
+        details={
+            "filename": meta.filename,
+            "original_filename": file.filename,
+            "size_bytes": meta.size_bytes,
+            "total_documents": meta.total_documents,
+            "collections": meta.collections,
+        },
+        ip_address=client_ip
+    )
+    return meta
+
+
+@router.post(
+    "/backups/upload-restore",
+    response_model=RestoreResponse,
+    summary="Upload an external backup archive and restore MongoDB immediately"
+)
+async def upload_and_restore_backup(
+    req: Request,
+    file: UploadFile = File(...),
+    confirmation_text: str = Form(...),
+    drop_existing: bool = Form(True),
+    current_admin: UserResponse = Depends(require_superadmin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> RestoreResponse:
+    if confirmation_text.strip().upper() != "RESTORE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Safety confirmation required. You must submit 'RESTORE' to proceed."
+        )
+
+    if not file.filename or not file.filename.endswith(".zip"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file must be a valid '.zip' archive."
+        )
+
+    contents = await file.read()
+    if len(contents) > 100 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Backup archive exceeds maximum allowable upload size of 100 MB."
+        )
+
+    # 1. Import archive into ledger
+    meta = await backup_service.import_backup_archive(contents, file.filename)
+
+    # 2. Trigger instant restore
+    res = await backup_service.restore_backup(
+        db=db,
+        filename=meta.filename,
+        confirmation_text=confirmation_text,
+        drop_existing=drop_existing
+    )
+
+    client_ip = req.client.host if req.client else None
+    await log_audit_event(
+        db,
+        actor_id=current_admin.id,
+        actor_email=current_admin.email,
+        action="DATABASE_BACKUP_UPLOAD_RESTORED",
+        target_id=meta.filename,
+        target_type="backup",
+        details={
+            "filename": meta.filename,
+            "original_filename": file.filename,
+            "restored_documents": res.total_documents_restored,
+            "collections": res.collections_restored,
+        },
+        ip_address=client_ip
+    )
+    return res
 

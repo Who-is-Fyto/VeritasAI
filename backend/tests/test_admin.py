@@ -262,6 +262,8 @@ async def test_admin_backup_lifecycle():
         assert list_res.status_code == 200
         list_data = list_res.json()
         assert list_data["total"] >= 1
+        assert "auto_backup_enabled" in list_data
+        assert "secondary_mirror_active" in list_data
         assert any(b["filename"] == filename for b in list_data["backups"])
 
         # 3. Download Backup
@@ -295,6 +297,81 @@ async def test_admin_backup_lifecycle():
         delete_res = await client.delete(f"/api/v1/admin/backups/{filename}", headers=headers)
         assert delete_res.status_code == 200
         assert delete_res.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_admin_backup_upload_and_disaster_recovery():
+    """Verify external archive upload and instant one-click disaster recovery."""
+    admin_token = create_access_token("admin-1")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Create a real backup first to obtain a valid archive
+        create_res = await client.post("/api/v1/admin/backups", headers=headers)
+        assert create_res.status_code == 201
+        created_file = create_res.json()["filename"]
+
+        # Download raw bytes
+        dl_res = await client.get(f"/api/v1/admin/backups/{created_file}/download", headers=headers)
+        assert dl_res.status_code == 200
+        archive_bytes = dl_res.content
+
+        # 1. Test Upload without instant restore
+        upload_res = await client.post(
+            "/api/v1/admin/backups/upload",
+            files={"file": ("external_archive.zip", archive_bytes, "application/zip")},
+            headers=headers
+        )
+        assert upload_res.status_code == 201
+        upload_data = upload_res.json()
+        assert upload_data["backup_type"] == "imported"
+        assert upload_data["status"] == "completed"
+        imported_filename = upload_data["filename"]
+
+        # 2. Test Upload and Instant Restore
+        restore_upload_res = await client.post(
+            "/api/v1/admin/backups/upload-restore",
+            files={"file": ("dr_archive.zip", archive_bytes, "application/zip")},
+            data={"confirmation_text": "RESTORE", "drop_existing": "true"},
+            headers=headers
+        )
+        assert restore_upload_res.status_code == 200
+        ru_data = restore_upload_res.json()
+        assert ru_data["status"] == "success"
+        assert ru_data["total_documents_restored"] >= 2
+
+        # Clean up files created
+        await client.delete(f"/api/v1/admin/backups/{created_file}", headers=headers)
+        await client.delete(f"/api/v1/admin/backups/{imported_filename}", headers=headers)
+        if "backup_filename" in ru_data:
+            await client.delete(f"/api/v1/admin/backups/{ru_data['backup_filename']}", headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_admin_automated_backup_and_pruning():
+    """Verify automated snapshot creation, metadata tagging, and retention pruning."""
+    from app.services.backup import backup_service
+    mock_db = MockDatabase()
+
+    # Create 3 automated backups
+    m1 = await backup_service.create_backup(mock_db, backup_type="automated")
+    m2 = await backup_service.create_backup(mock_db, backup_type="automated")
+    m3 = await backup_service.create_backup(mock_db, backup_type="automated")
+
+    assert m1.backup_type == "automated"
+    assert m2.backup_type == "automated"
+    assert m3.backup_type == "automated"
+
+    # Prune to retain only 2
+    pruned = backup_service.prune_automated_backups(keep_count=2)
+    assert pruned >= 1
+
+    # Clean up test backups
+    for m in [m1, m2, m3]:
+        try:
+            backup_service.delete_backup(m.filename)
+        except Exception:
+            pass
 
 
 @pytest.mark.asyncio

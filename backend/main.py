@@ -8,8 +8,10 @@ The lifespan context manager handles startup/shutdown tasks:
   - MongoDB connection pool
   - AI model pre-loading (slow — done once at startup, not per request)
 """
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +27,41 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def automated_backup_loop():
+    """
+    Background worker that runs periodically to trigger automated MongoDB snapshots.
+    Guarded against concurrent execution and silent failures.
+    """
+    logger.info("Automated backup supervisor started.")
+    while True:
+        try:
+            # Poll every 60 minutes
+            await asyncio.sleep(3600)
+            if not settings.backup_auto_enabled:
+                continue
+
+            from app.services.backup import backup_service
+            listing = await backup_service.list_backups()
+            now = datetime.now(timezone.utc)
+            should_run = True
+            for b in listing.backups:
+                if b.backup_type == "automated":
+                    elapsed_hours = (now - b.created_at).total_seconds() / 3600.0
+                    if elapsed_hours < settings.backup_auto_interval_hours:
+                        should_run = False
+                        break
+
+            if should_run:
+                db = get_db()
+                logger.info("Automated backup interval reached (%dh). Creating snapshot...", settings.backup_auto_interval_hours)
+                await backup_service.create_backup(db, backup_type="automated")
+        except asyncio.CancelledError:
+            logger.info("Automated database backup supervisor shut down.")
+            break
+        except Exception as e:
+            logger.error("Error in automated backup supervisor loop: %s", e)
 
 
 # ── Lifespan: runs on startup and shutdown ───────────────────────────────
@@ -43,8 +80,14 @@ async def lifespan(app: FastAPI):
     # Model is already instantiated as a module-level singleton in
     # linguistic.py — no additional loading needed here unless you want
     # to pre-warm it with a dummy inference pass.
+    backup_task = asyncio.create_task(automated_backup_loop())
     yield
     # ── SHUTDOWN ─────────────────────────────────────────────────────────
+    backup_task.cancel()
+    try:
+        await backup_task
+    except asyncio.CancelledError:
+        pass
     await close_db()
     logger.info("VeritasAI shut down cleanly.")
 

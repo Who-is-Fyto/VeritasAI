@@ -10,9 +10,10 @@ import io
 import logging
 import os
 import re
+import shutil
 import uuid
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -66,6 +67,18 @@ class BackupService:
             logger.warning("Permission denied for %s. Falling back to %s", self.backup_dir, fallback)
             self.backup_dir = fallback
 
+        # Optional secondary mirror directory (3-2-1 backup strategy)
+        self.secondary_dir: Optional[Path] = None
+        if settings.backup_secondary_dir:
+            try:
+                sec_path = Path(settings.backup_secondary_dir)
+                sec_path.mkdir(parents=True, exist_ok=True)
+                self.secondary_dir = sec_path
+                logger.info("Secondary backup mirror initialised at: %s", self.secondary_dir)
+            except Exception as sec_err:
+                logger.warning("Could not initialise secondary backup mirror at %s: %s", settings.backup_secondary_dir, sec_err)
+                self.secondary_dir = None
+
         logger.info("BackupService initialised at: %s", self.backup_dir)
 
     def _sanitize_filename(self, filename: str) -> str:
@@ -77,14 +90,62 @@ class BackupService:
             )
         return clean
 
-    async def create_backup(self, db: AsyncIOMotorDatabase) -> BackupMetadata:
+    def prune_automated_backups(self, keep_count: int) -> int:
+        """
+        Retains at most `keep_count` automated backup archives and deletes older ones.
+        Also synchronises deletions with the secondary mirror directory.
+        """
+        if keep_count <= 0:
+            return 0
+
+        auto_files: List[Path] = []
+        for file_path in self.backup_dir.glob("*.zip"):
+            if file_path.name.startswith("."):
+                continue
+            is_auto = False
+            if file_path.name.startswith("veritas_autobackup_"):
+                is_auto = True
+            else:
+                try:
+                    with zipfile.ZipFile(file_path, "r") as zf:
+                        if "manifest.json" in zf.namelist():
+                            manifest = json_util.loads(zf.read("manifest.json").decode("utf-8"))
+                            if manifest.get("backup_type") == "automated":
+                                is_auto = True
+                except Exception:
+                    pass
+            if is_auto:
+                auto_files.append(file_path)
+
+        auto_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+
+        pruned_count = 0
+        if len(auto_files) > keep_count:
+            for old_file in auto_files[keep_count:]:
+                try:
+                    old_file.unlink(missing_ok=True)
+                    if self.secondary_dir:
+                        (self.secondary_dir / old_file.name).unlink(missing_ok=True)
+                    pruned_count += 1
+                    logger.info("Pruned expired automated backup archive: %s", old_file.name)
+                except Exception as err:
+                    logger.warning("Failed to prune expired backup %s: %s", old_file.name, err)
+        return pruned_count
+
+    async def create_backup(
+        self,
+        db: AsyncIOMotorDatabase,
+        backup_type: str = "manual"
+    ) -> BackupMetadata:
         """
         Dumps MongoDB collections to compressed JSON/BSON zip archive with metadata manifest.
+        Supports 'manual' and 'automated' snapshots, optional mirroring, and retention pruning.
         """
         now = datetime.now(timezone.utc)
         timestamp_str = now.strftime("%Y%m%d_%H%M%S")
         backup_id = str(uuid.uuid4())
-        filename = f"veritas_backup_{timestamp_str}.zip"
+        prefix = "veritas_autobackup" if backup_type == "automated" else "veritas_backup"
+        filename = f"{prefix}_{timestamp_str}_{backup_id[:8]}.zip"
         target_path = self.backup_dir / filename
 
         # 1. Discover target collections
@@ -113,6 +174,7 @@ class BackupService:
         manifest: Dict[str, Any] = {
             "backup_id": backup_id,
             "filename": filename,
+            "backup_type": backup_type,
             "created_at": now.isoformat(),
             "database_name": db.name,
             "app_version": settings.app_version,
@@ -141,9 +203,23 @@ class BackupService:
             temp_path.rename(target_path)
             size_bytes = target_path.stat().st_size
 
+            # Mirror to secondary backup destination if configured
+            mirrored = False
+            if self.secondary_dir:
+                try:
+                    shutil.copy2(target_path, self.secondary_dir / filename)
+                    mirrored = True
+                    logger.info("Mirrored backup archive %s to secondary storage at %s", filename, self.secondary_dir)
+                except Exception as copy_err:
+                    logger.warning("Failed to mirror backup to %s: %s", self.secondary_dir, copy_err)
+
+            # Auto-prune old automated backups
+            if backup_type == "automated":
+                self.prune_automated_backups(settings.backup_auto_retention_count)
+
             logger.info(
-                "Created backup %s (%s, %d docs, sha256:%s)",
-                filename, format_bytes(size_bytes), total_documents, checksum[:8]
+                "Created backup %s (%s, %d docs, sha256:%s, type:%s, mirrored:%s)",
+                filename, format_bytes(size_bytes), total_documents, checksum[:8], backup_type, mirrored
             )
 
             return BackupMetadata(
@@ -155,7 +231,9 @@ class BackupService:
                 collections=collections_summary,
                 total_documents=total_documents,
                 checksum_sha256=checksum,
-                status="completed"
+                status="completed",
+                backup_type=backup_type,
+                mirrored=mirrored
             )
         except Exception as e:
             if temp_path.exists():
@@ -166,12 +244,81 @@ class BackupService:
                 detail=f"Backup generation failed: {str(e)}"
             )
 
+    async def import_backup_archive(self, file_bytes: bytes, original_filename: str) -> BackupMetadata:
+        """
+        Validates, saves, and registers an uploaded external backup zip archive.
+        Ensures strict manifest verification and mirrors to secondary storage if enabled.
+        """
+        try:
+            zf_check = zipfile.ZipFile(io.BytesIO(file_bytes), "r")
+            namelist = zf_check.namelist()
+            if "manifest.json" not in namelist:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid backup archive: missing 'manifest.json' metadata manifest."
+                )
+            manifest_raw = zf_check.read("manifest.json").decode("utf-8")
+            manifest_data = json_util.loads(manifest_raw)
+            zf_check.close()
+        except zipfile.BadZipFile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file is not a valid ZIP archive."
+            )
+
+        now = datetime.now(timezone.utc)
+        timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+        safe_base = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", os.path.basename(original_filename.strip()))
+        if not safe_base.endswith(".zip"):
+            safe_base += ".zip"
+        filename = f"veritas_imported_{timestamp_str}_{safe_base}"
+        target_path = self.backup_dir / filename
+
+        target_path.write_bytes(file_bytes)
+        size_bytes = len(file_bytes)
+
+        hasher = hashlib.sha256(file_bytes)
+        checksum = hasher.hexdigest()
+
+        mirrored = False
+        if self.secondary_dir:
+            try:
+                shutil.copy2(target_path, self.secondary_dir / filename)
+                mirrored = True
+                logger.info("Mirrored imported backup archive %s to secondary storage at %s", filename, self.secondary_dir)
+            except Exception as copy_err:
+                logger.warning("Failed to mirror imported backup: %s", copy_err)
+
+        backup_id = manifest_data.get("backup_id", str(uuid.uuid4()))
+        collections = manifest_data.get("collections", {})
+        total_documents = manifest_data.get("total_documents", sum(collections.values()))
+
+        logger.info(
+            "Imported external backup %s (%s, %d docs, sha256:%s)",
+            filename, format_bytes(size_bytes), total_documents, checksum[:8]
+        )
+
+        return BackupMetadata(
+            backup_id=backup_id,
+            filename=filename,
+            created_at=now,
+            size_bytes=size_bytes,
+            size_formatted=format_bytes(size_bytes),
+            collections=collections,
+            total_documents=total_documents,
+            checksum_sha256=checksum,
+            status="completed",
+            backup_type="imported",
+            mirrored=mirrored
+        )
+
     async def list_backups(self) -> BackupListResponse:
         """
-        Lists all available historical backup archives with metadata.
+        Lists all available historical backup archives with metadata and schedule status.
         """
         backups: List[BackupMetadata] = []
         total_size = 0
+        latest_auto_dt: Optional[datetime] = None
 
         files = sorted(
             [f for f in self.backup_dir.glob("*.zip") if not f.name.startswith(".")],
@@ -191,6 +338,12 @@ class BackupService:
                 collections: Dict[str, int] = {}
                 total_docs = 0
                 checksum = None
+                backup_type = "manual"
+
+                if file_path.name.startswith("veritas_autobackup_"):
+                    backup_type = "automated"
+                elif file_path.name.startswith("veritas_imported_"):
+                    backup_type = "imported"
 
                 try:
                     with zipfile.ZipFile(file_path, "r") as zf:
@@ -200,6 +353,7 @@ class BackupService:
                             backup_id = manifest_data.get("backup_id", backup_id)
                             collections = manifest_data.get("collections", {})
                             total_docs = manifest_data.get("total_documents", sum(collections.values()))
+                            backup_type = manifest_data.get("backup_type", backup_type)
                             if "created_at" in manifest_data:
                                 try:
                                     created_at = datetime.fromisoformat(manifest_data["created_at"])
@@ -207,6 +361,11 @@ class BackupService:
                                     pass
                 except Exception as zip_err:
                     logger.warning("Could not read manifest for %s: %s", file_path.name, zip_err)
+
+                if backup_type == "automated" and (latest_auto_dt is None or created_at > latest_auto_dt):
+                    latest_auto_dt = created_at
+
+                mirrored = bool(self.secondary_dir and (self.secondary_dir / file_path.name).is_file())
 
                 backups.append(BackupMetadata(
                     backup_id=backup_id,
@@ -217,16 +376,33 @@ class BackupService:
                     collections=collections,
                     total_documents=total_docs,
                     checksum_sha256=checksum,
-                    status="completed"
+                    status="completed",
+                    backup_type=backup_type,
+                    mirrored=mirrored
                 ))
             except Exception as e:
                 logger.warning("Error processing backup file %s: %s", file_path.name, e)
+
+        # Compute next scheduled backup
+        next_scheduled: Optional[datetime] = None
+        if settings.backup_auto_enabled:
+            interval = timedelta(hours=settings.backup_auto_interval_hours)
+            if latest_auto_dt:
+                next_scheduled = latest_auto_dt + interval
+            else:
+                next_scheduled = datetime.now(timezone.utc) + interval
+
+        secondary_active = bool(self.secondary_dir and self.secondary_dir.exists())
 
         return BackupListResponse(
             backups=backups,
             total=len(backups),
             total_size_bytes=total_size,
-            total_size_formatted=format_bytes(total_size)
+            total_size_formatted=format_bytes(total_size),
+            auto_backup_enabled=settings.backup_auto_enabled,
+            auto_backup_interval_hours=settings.backup_auto_interval_hours,
+            secondary_mirror_active=secondary_active,
+            next_scheduled_backup=next_scheduled
         )
 
     def get_backup_path(self, filename: str) -> Path:
@@ -241,10 +417,14 @@ class BackupService:
         return path
 
     def delete_backup(self, filename: str) -> None:
-        """Safely removes a backup archive from disk."""
+        """Safely removes a backup archive from primary disk and secondary mirror."""
         path = self.get_backup_path(filename)
+        safe_name = path.name
         try:
             path.unlink()
+            if self.secondary_dir:
+                sec_path = self.secondary_dir / safe_name
+                sec_path.unlink(missing_ok=True)
             logger.info("Deleted backup archive: %s", filename)
         except Exception as e:
             logger.error("Failed to delete backup %s: %s", filename, e)

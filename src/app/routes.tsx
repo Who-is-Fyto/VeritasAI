@@ -7,6 +7,7 @@ import { Verify } from "./components/Verify";
 import { Results } from "./components/Results";
 import { Profile } from "./components/Profile";
 import { AdminDashboard } from "./components/AdminDashboard";
+import { PresentationDeck } from "./components/PresentationDeck";
 import { Login } from "./components/Login";
 import { Signup } from "./components/Signup";
 import { NotFound } from "./components/NotFound";
@@ -109,6 +110,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, Component: Home },
+      { path: "presentation", Component: PresentationDeck },
       { path: "login", Component: Login },
       { path: "signup", Component: Signup },
       { 

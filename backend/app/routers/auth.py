@@ -23,7 +23,8 @@ from app.schemas.auth import (
     UserRegister, UserLogin, UserResponse, TokenResponse,
     APIKeyCreate, APIKeyResponse, APIKeyGeneratedResponse,
     UserProfileUpdate, TierUpdateRequest, VerifyOtpRequest,
-    ResendOtpRequest, OtpResponse, LoginResponse
+    ResendOtpRequest, OtpResponse, LoginResponse,
+    ForgotPasswordRequest, ResetPasswordRequest
 )
 from app.services.affiliation import resolve_user_affiliation
 from app.services.email import send_otp_email
@@ -648,6 +649,156 @@ async def resend_otp(
         expires_in_seconds=600,
         dev_otp=dev_otp
     )
+
+
+# ── POST /api/v1/auth/forgot-password/request-otp ─────────────────────────
+@router.post(
+    "/forgot-password/request-otp",
+    response_model=OtpResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Request a 6-digit verification PIN to reset a forgotten password"
+)
+async def forgot_password_request_otp(
+    body: ForgotPasswordRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> OtpResponse:
+    clean_email = body.email.strip().lower()
+    user = await db["users"].find_one({
+        "email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}
+    })
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No account registered with this email address."
+        )
+
+    if user.get("is_suspended", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been administratively suspended. Contact support."
+        )
+
+    now = datetime.now(timezone.utc)
+    existing = await db["verification_otps"].find_one({
+        "email": clean_email,
+        "purpose": "forgot_password"
+    })
+    if existing:
+        ex_created = existing["created_at"]
+        if ex_created.tzinfo is None:
+            ex_created = ex_created.replace(tzinfo=timezone.utc)
+        elapsed = (now - ex_created).total_seconds()
+        if elapsed < 30:
+            wait_time = int(30 - elapsed)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {wait_time} seconds before requesting another reset code."
+            )
+
+    otp = f"{secrets.randbelow(900000) + 100000}"
+    otp_hash = hashlib.sha256(otp.encode("utf-8")).hexdigest()
+    expires_at = now + timedelta(minutes=10)
+
+    await db["verification_otps"].delete_many({"email": clean_email, "purpose": "forgot_password"})
+    await db["verification_otps"].insert_one({
+        "email": clean_email,
+        "otp_hash": otp_hash,
+        "purpose": "forgot_password",
+        "created_at": now,
+        "expires_at": expires_at,
+        "attempts": 0
+    })
+
+    await send_otp_email(clean_email, otp, purpose="forgot_password")
+    dev_otp = otp if (settings.app_env == "development" or not (settings.smtp_user and settings.smtp_password)) else None
+
+    logger.info("Password reset OTP requested for: %s", clean_email)
+    return OtpResponse(
+        status="success",
+        message="A 6-digit password reset PIN has been sent to your email.",
+        email=clean_email,
+        expires_in_seconds=600,
+        dev_otp=dev_otp
+    )
+
+
+# ── POST /api/v1/auth/forgot-password/reset ───────────────────────────────
+@router.post(
+    "/forgot-password/reset",
+    status_code=status.HTTP_200_OK,
+    summary="Verify OTP PIN and reset password"
+)
+async def forgot_password_reset(
+    body: ResetPasswordRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    clean_email = body.email.strip().lower()
+    now = datetime.now(timezone.utc)
+
+    user = await db["users"].find_one({
+        "email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}
+    })
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No account registered with this email address."
+        )
+
+    record = await db["verification_otps"].find_one({
+        "email": clean_email,
+        "purpose": "forgot_password"
+    })
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active password reset verification found. Please request a new PIN."
+        )
+
+    record_expires = record["expires_at"]
+    if record_expires.tzinfo is None:
+        record_expires = record_expires.replace(tzinfo=timezone.utc)
+
+    if record_expires < now:
+        await db["verification_otps"].delete_one({"_id": record["_id"]})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset code has expired. Please request a new code."
+        )
+
+    if record.get("attempts", 0) >= 5:
+        await db["verification_otps"].delete_one({"_id": record["_id"]})
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Maximum verification attempts exceeded. Please request a new code."
+        )
+
+    candidate_hash = hashlib.sha256(body.otp.strip().encode("utf-8")).hexdigest()
+    if candidate_hash != record["otp_hash"]:
+        await db["verification_otps"].update_one(
+            {"_id": record["_id"]},
+            {"$inc": {"attempts": 1}}
+        )
+        remaining = 4 - record.get("attempts", 0)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid verification code. {max(0, remaining)} attempts remaining."
+        )
+
+    # Hash new password and update user record
+    hashed_password = get_password_hash(body.new_password)
+    await db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password": hashed_password, "updated_at": now}}
+    )
+
+    # Clean up OTP records
+    await db["verification_otps"].delete_many({"email": clean_email, "purpose": "forgot_password"})
+    logger.info("Password successfully reset via OTP for user: %s (%s)", clean_email, user["_id"])
+
+    return {
+        "status": "success",
+        "message": "Your password has been successfully reset. You may now sign in with your new password."
+    }
 
 
 # ── GET /api/v1/auth/me ──────────────────────────────────────────────────

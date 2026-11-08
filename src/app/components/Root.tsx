@@ -62,6 +62,11 @@ export function Root() {
               <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Platform Resources</h4>
               <ul className="space-y-1.5 text-slate-500">
                 <li>
+                  <Link to="/presentation" className="text-blue-600 font-semibold hover:underline flex items-center gap-1.5">
+                    <span>Defense Presentation Deck</span>
+                  </Link>
+                </li>
+                <li>
                   <Link to="/verify" className="hover:text-blue-600 transition-colors">
                     Verify Article or URL
                   </Link>

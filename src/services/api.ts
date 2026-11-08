@@ -50,6 +50,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         db_connected: true,
       } as T;
     }
+    if (path.startsWith("/api/v1/auth/forgot-password/request-otp")) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      return {
+        status: "success",
+        message: "A 6-digit password reset PIN has been sent to your email.",
+        email: body.email,
+        expires_in_seconds: 600,
+        dev_otp: "123456",
+      } as T;
+    }
+    if (path.startsWith("/api/v1/auth/forgot-password/reset")) {
+      return {
+        status: "success",
+        message: "Your password has been successfully reset. You may now sign in with your new password.",
+      } as T;
+    }
     if (path.startsWith("/api/v1/auth/register") || path.startsWith("/api/v1/auth/login")) {
       const body = options?.body ? JSON.parse(options.body as string) : {};
       const email = (body.email || "demo@veritas.ai").trim();
@@ -492,6 +508,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         total: list.length,
         total_size_bytes: totalBytes,
         total_size_formatted: `${(totalBytes / 1024).toFixed(1)} KB`,
+        auto_backup_enabled: true,
+        auto_backup_interval_hours: 12,
+        secondary_mirror_active: true,
+        next_scheduled_backup: new Date(Date.now() + 6 * 3600 * 1000).toISOString(),
       } as T;
     }
     if (path.startsWith("/api/v1/analyse")) {
@@ -840,10 +860,39 @@ export const veritasAPI = {
    * POST /api/v1/auth/resend-otp
    * Resend a fresh 6-digit verification PIN.
    */
-  resendOtp: (email: string, purpose: "signup" | "login"): Promise<{ status: string; message: string; email: string; expires_in_seconds: number; dev_otp?: string | null }> =>
+  resendOtp: (email: string, purpose: "signup" | "login" | "forgot_password"): Promise<{ status: string; message: string; email: string; expires_in_seconds: number; dev_otp?: string | null }> =>
     request("/api/v1/auth/resend-otp", {
       method: "POST",
       body: JSON.stringify({ email, purpose }),
+    }),
+
+  /**
+   * POST /api/v1/auth/forgot-password/request-otp
+   * Request a 6-digit PIN to reset a forgotten password.
+   */
+  forgotPasswordRequestOtp: (email: string): Promise<{
+    status: string;
+    message: string;
+    email: string;
+    expires_in_seconds: number;
+    dev_otp?: string | null;
+  }> =>
+    request("/api/v1/auth/forgot-password/request-otp", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  /**
+   * POST /api/v1/auth/forgot-password/reset
+   * Verify OTP and set a new password.
+   */
+  forgotPasswordReset: (email: string, otp: string, new_password: string): Promise<{
+    status: string;
+    message: string;
+  }> =>
+    request("/api/v1/auth/forgot-password/reset", {
+      method: "POST",
+      body: JSON.stringify({ email, otp, new_password }),
     }),
 
   /**
@@ -1059,6 +1108,89 @@ export const veritasAPI = {
     request(`/api/v1/admin/backups/${encodeURIComponent(filename)}`, {
       method: "DELETE",
     }),
+
+  /**
+   * POST /api/v1/admin/backups/upload
+   * Upload and register an external backup zip archive.
+   */
+  adminUploadBackup: async (file: File): Promise<BackupMetadata> => {
+    if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const now = new Date();
+      const mock: BackupMetadata = {
+        backup_id: `bkp-up-${Math.random().toString(36).substring(2, 9)}`,
+        filename: `veritas_imported_${now.toISOString().replace(/[-:T]/g, "").slice(0, 14)}_${file.name.replace(/[^a-zA-Z0-9_\-\.]/g, "_")}`,
+        created_at: now.toISOString(),
+        size_bytes: file.size || 256000,
+        size_formatted: `${((file.size || 256000) / 1024).toFixed(1)} KB`,
+        collections: { users: 18, results: 164, api_keys: 12, feedback: 42, audit_logs: 94 },
+        total_documents: 330,
+        checksum_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        status: "completed",
+        backup_type: "imported",
+        mirrored: true,
+      };
+      const stored = localStorage.getItem("veritas_mock_backups");
+      const list = stored ? JSON.parse(stored) : [];
+      localStorage.setItem("veritas_mock_backups", JSON.stringify([mock, ...list]));
+      return mock;
+    }
+    const token = localStorage.getItem("veritas_token");
+    const formData = new FormData();
+    formData.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/v1/admin/backups/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to upload backup archive" }));
+      throw new VeritasAPIError(res.status, err.detail ?? "Failed to upload backup archive");
+    }
+    return res.json();
+  },
+
+  /**
+   * POST /api/v1/admin/backups/upload-restore
+   * Upload an external archive and immediately trigger atomic disaster recovery.
+   */
+  adminUploadAndRestoreBackup: async (
+    file: File,
+    confirmationText: string,
+    dropExisting: boolean = true
+  ): Promise<RestoreResponse> => {
+    if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      if (confirmationText.trim().toUpperCase() !== "RESTORE") {
+        throw new VeritasAPIError(400, "Safety confirmation required. You must submit 'RESTORE' to proceed.");
+      }
+      return {
+        status: "success",
+        backup_filename: file.name,
+        restored_at: new Date().toISOString(),
+        collections_restored: { users: 18, results: 164, api_keys: 12, feedback: 42, audit_logs: 94 },
+        total_documents_restored: 330,
+        message: `Database successfully restored from imported archive '${file.name}'.`,
+      };
+    }
+    const token = localStorage.getItem("veritas_token");
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("confirmation_text", confirmationText);
+    formData.append("drop_existing", String(dropExisting));
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/v1/admin/backups/upload-restore`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Disaster recovery restore failed" }));
+      throw new VeritasAPIError(res.status, err.detail ?? "Disaster recovery restore failed");
+    }
+    return res.json();
+  },
 };
 
 

@@ -227,9 +227,48 @@ class ResendOtpRequest(BaseModel):
     @classmethod
     def validate_purpose(cls, v: str) -> str:
         clean = v.strip().lower()
-        if clean not in {"signup", "login"}:
-            raise ValueError("Purpose must be 'signup' or 'login'")
+        if clean not in {"signup", "login", "forgot_password"}:
+            raise ValueError("Purpose must be 'signup', 'login', or 'forgot_password'")
         return clean
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: str) -> str:
+        return validate_strict_email(v)
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: str) -> str:
+        return validate_strict_email(v)
+
+    @field_validator("otp")
+    @classmethod
+    def clean_otp(cls, v: str) -> str:
+        clean = v.strip()
+        if not re.match(r"^\d{6}$", clean):
+            raise ValueError("Verification code must be exactly 6 numeric digits")
+        return clean
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[a-zA-Z]", v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r"[0-9!@#$%^&*()_+\-=\[\]{};':\",.<>/?\\|]", v):
+            raise ValueError("Password must contain at least one number or special character")
+        return v
 
 
 class OtpResponse(BaseModel):

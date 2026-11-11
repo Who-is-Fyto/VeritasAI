@@ -30,9 +30,9 @@ VeritasAI is a web-based AI platform that evaluates the authenticity of English-
 
 | Dimension | Weight | Description |
 |---|---|---|
-| **Linguistic Analysis** | 40% | RoBERTa NLP detects stylometric patterns, AI-generation signatures, and manipulation markers |
-| **Source Authority** | 35% | Publisher domain credibility scored against MediaBias/FactCheck and editorial standards databases |
-| **External Corroboration** | 25% | Claims cross-referenced in real time against the News API and authoritative news sources |
+| **Linguistic Analysis** | 40% | RoBERTa transformer inference ensembled with forensic stylometrics (cadence burstiness, Type-Token Ratio, Shannon entropy, 120+ synthetic transition markers) and sentence-level XAI |
+| **Source Authority** | 35% | Publisher domain credibility scored against a 100+ media organization registry (MBFC, NewsGuard-style criteria, Wikipedia, Britannica), anti-spoofing attribution framing, and discovered source bridging |
+| **External Corroboration** | 25% | Claims cross-referenced concurrently across Google Fact Check Tools API, Google News RSS, DuckDuckGo organic search, News API, and Wikipedia Action API with refutation stance detection |
 
 The platform also includes an **Explainable AI (XAI) output layer** — the "Truth Map" — which highlights the specific phrases in the submitted text that most influenced the Credibility Index score.
 
@@ -43,35 +43,41 @@ The platform also includes an **Explainable AI (XAI) output layer** — the "Tru
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        React Frontend                           │
-│  Home.tsx → Verify.tsx ──── POST /api/v1/analyse ──► Results.tsx│
-│                 │                                               │
-│         src/services/api.ts  (typed HTTP client)               │
-└────────────────────┬────────────────────────────────────────────┘
-                     │  HTTP (Vite proxy in dev / direct in prod)
-┌────────────────────▼────────────────────────────────────────────┐
-│                   FastAPI Backend (Uvicorn)                      │
-│                                                                 │
-│  POST /api/v1/analyse                                           │
-│    │                                                            │
-│    ├── LinguisticService ──► RoBERTa (HuggingFace)             │
-│    │      └── XAI annotations (attention / LIME)               │
-│    │                                                            │
-│    ├── SourceAuthorityService ──► MBFC database / Google CSE   │
-│    │                                                            │
-│    └── CorroborationService ──► News API + sentence-transformers│
-│                                                                 │
-│    asyncio.gather() runs all three concurrently                 │
-│    → compute weighted ensemble score                            │
-│    → persist AnalysisResult to MongoDB                          │
-│    → return JSON to frontend                                    │
-└────────────────────┬────────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────────┐
-│                   MongoDB (Motor async driver)                   │
-│   Collection: results  — stores AnalysisResult documents        │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                             React Frontend                              │
+│  Home.tsx → Verify.tsx ───── POST /api/v1/analyse ────► Results.tsx     │
+│                 │                                                       │
+│         src/services/api.ts (typed HTTP client, mock/live parity)       │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ HTTP (Vite proxy / direct)
+┌────────────────────────────────────▼────────────────────────────────────┐
+│                        FastAPI Backend (Uvicorn)                        │
+│                                                                         │
+│  POST /api/v1/analyse                                                   │
+│    │                                                                    │
+│    ├── LinguisticService ──► RoBERTa + Stylometrics (Burstiness / TTR)  │
+│    │      └── XAI annotations (manipulative, verified, neutral)         │
+│    │                                                                    │
+│    ├── SourceAuthorityService ──► 100+ Publisher Registry + Bridging    │
+│    │      └── Anti-spoofing attribution verification                    │
+│    │                                                                    │
+│    └── CorroborationService ──► Multi-Source Fact Checking & Press      │
+│           ├── Google Fact Check Tools API (IFCN Signatories)            │
+│           ├── Google News RSS live feeds & DuckDuckGo organic search    │
+│           ├── Wikipedia Knowledge Engine (Action API intro extracts)    │
+│           └── News API + Stance / Refutation Detection                  │
+│                                                                         │
+│    asyncio.gather() runs all three concurrently                         │
+│    → Discovered source authority bridging for pasted text               │
+│    → Compute weighted ensemble MCDA score (40/35/25)                    │
+│    → Persist AnalysisResult to MongoDB (2-hour SHA-256 cache)           │
+│    → Return AnalysisResult JSON to frontend                             │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+┌────────────────────────────────────▼────────────────────────────────────┐
+│                      MongoDB (Motor async driver)                       │
+│   Collections: results, users, api_keys, feedback, audit_logs           │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -103,46 +109,57 @@ The platform also includes an **Explainable AI (XAI) output layer** — the "Tru
 ```
 VeritasAI/
 │
-├── src/                            # React frontend
+├── src/                            # React frontend (Vite 6 + TailwindCSS v4)
 │   ├── app/
+│   │   ├── App.tsx                 # Root application & routing
 │   │   └── components/
 │   │       ├── Home.tsx            # Landing page
-│   │       ├── Verify.tsx          # Content submission page
-│   │       ├── Results.tsx         # Credibility Index report + Truth Map
-│   │       ├── Header.tsx
-│   │       └── ui/                 # shadcn/ui component library
+│   │       ├── Verify.tsx          # Multi-input submission (Text, URL, Upload)
+│   │       ├── Results.tsx         # Comprehensive Credibility Index report
+│   │       ├── CredibilityGauge.tsx # Institutional Truth-O-Meter gauge
+│   │       ├── SourceNutritionLabel.tsx # Publisher transparency scorecard
+│   │       ├── CorroborationGraph.tsx # Dynamic SVG claim relationship graph
+│   │       ├── ForensicStylometrics.tsx # Sentence heatmap & perplexity panel
+│   │       ├── AuditCertificateModal.tsx # Verifiable PDF audit certificate
+│   │       ├── AdminDashboard.tsx  # RBAC system management & backup recovery
+│   │       ├── Header.tsx          # Brand header & navigation
+│   │       └── ui/                 # Accessible UI component library
 │   ├── services/
-│   │   └── api.ts                  # ★ Typed HTTP client (veritasAPI)
+│   │   └── api.ts                  # Typed HTTP client with full mock/live parity
 │   ├── types/
-│   │   └── analysis.ts             # ★ Shared TypeScript interfaces
+│   │   └── analysis.ts             # Shared TypeScript data models
 │   └── styles/
-│       └── theme.css               # CSS variables and design tokens
+│       └── theme.css               # Design tokens, color themes & CSS variables
 │
 ├── backend/
-│   ├── main.py                     # ★ FastAPI app entry point
+│   ├── main.py                     # FastAPI application entry point
 │   ├── requirements.txt
-│   ├── .env.example                # Copy to .env and fill in keys
+│   ├── .env.example                # Configuration template
 │   ├── Dockerfile
 │   └── app/
-│       ├── config.py               # ★ Pydantic settings (reads .env)
+│       ├── config.py               # Pydantic BaseSettings (reads .env)
 │       ├── schemas/
-│       │   ├── request.py          # AnalyseRequest schema
-│       │   └── response.py         # ★ AnalysisResult + sub-schemas
+│       │   ├── request.py          # AnalyseRequest schema & validators
+│       │   ├── response.py         # AnalysisResult, XAI, Claims, Sources schemas
+│       │   └── auth.py             # User models, token schemas, tier validation
 │       ├── db/
-│       │   └── mongodb.py          # ★ Motor connection + get_db()
+│       │   └── mongodb.py          # Async Motor client & index lifecycle
 │       ├── routers/
-│       │   ├── health.py           # GET /api/v1/health
-│       │   └── analysis.py         # ★ POST /api/v1/analyse + GET /api/v1/results/:id
+│       │   ├── health.py           # GET /api/v1/health (readiness probe)
+│       │   ├── analysis.py         # POST /api/v1/analyse & GET /api/v1/results/:id
+│       │   ├── auth.py             # JWT login, registration, developer API keys
+│       │   └── admin.py            # RBAC user management, telemetry & backup APIs
 │       └── services/
-│           ├── linguistic.py       # ★ RoBERTa NLP + XAI (completed)
-│           ├── source.py           # ★ Domain authority scoring (completed)
-│           └── corroboration.py    # ★ News API cross-reference (completed)
+│           ├── linguistic.py       # RoBERTa transformer + forensic stylometrics
+│           ├── source.py           # 100+ domain registry + anti-spoofing
+│           ├── corroboration.py    # Multi-source fact-checker & stance engine
+│           ├── backup.py           # BSON compressed backup & restore engine
+│           ├── trainer.py          # Active learning continuous retraining
+│           └── affiliation.py      # Institutional transparency profiling
 │
-├── docker-compose.yml              # ★ Full stack: frontend + backend + MongoDB
-├── vite.config.ts                  # Vite config with /api proxy
-└── README.md                       # This file
-
-★ = key files to focus on
+├── docker-compose.yml              # Full stack orchestration (React + FastAPI + MongoDB)
+├── vite.config.ts                  # Vite config with backend proxy
+└── README.md                       # Master project documentation
 ```
 
 ---
@@ -344,225 +361,69 @@ The three services in `backend/app/services/` are fully implemented. This sectio
 
 ---
 
-### 1. Linguistic Analysis — `services/linguistic.py`
+### 1. Linguistic Analysis & Forensic Stylometrics — `services/linguistic.py`
 
-**Goal:** Use a fine-tuned RoBERTa transformer to score text credibility and produce XAI phrase annotations.
+**Goal:** Combine fine-tuned transformer inference with deterministic forensic stylometrics and sentence-level explainable AI (XAI) annotations.
 
-**Step 1 — Fine-tune the model**
-
-The model is `roberta-base` from HuggingFace, fine-tuned as a sequence classifier on the LIAR dataset (6-class: pants-fire, false, barely-true, half-true, mostly-true, true).
-
-```bash
-# Install datasets
-pip install datasets
-
-# Training script outline:
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
-from datasets import load_dataset
-
-dataset = load_dataset("liar")
-tokenizer = AutoTokenizer.from_pretrained("roberta-base")
-
-def tokenize(batch):
-    return tokenizer(batch["statement"], truncation=True, max_length=512, padding="max_length")
-
-tokenized = dataset.map(tokenize, batched=True)
-model = AutoModelForSequenceClassification.from_pretrained("roberta-base", num_labels=6)
-
-args = TrainingArguments(
-    output_dir="./models/roberta-fakenews",
-    num_train_epochs=3,
-    per_device_train_batch_size=16,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
-    load_best_model_at_end=True,
-)
-trainer = Trainer(model=model, args=args,
-                  train_dataset=tokenized["train"],
-                  eval_dataset=tokenized["validation"])
-trainer.train()
-trainer.save_model("./models/roberta-fakenews")
-```
-
-Save the checkpoint to `backend/models/roberta-fakenews/` and update `MODEL_PATH` in `.env`.
-
-**Step 2 — Real-time inference**
-
-```python
-# In LinguisticService.__init__:
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
-
-self._tokenizer = AutoTokenizer.from_pretrained(settings.model_path)
-self._model = AutoModelForSequenceClassification.from_pretrained(settings.model_path)
-self._model.eval()
-self._model_loaded = True
-
-# In LinguisticService.analyse:
-inputs = self._tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-with torch.no_grad():
-    outputs = self._model(**inputs)
-probs = torch.softmax(outputs.logits, dim=-1)[0]
-# Map class probabilities to a 0-100 credibility score
-credibility_score = (probs[3] + probs[4] + probs[5]).item() * 100  # mostly-true + true
-ai_prob = (probs[0] + probs[1]).item() * 100  # pants-fire + false
-```
-
-**Step 3 — XAI phrase annotations (LIME)**
-
-LIME (Local Interpretable Model-agnostic Explanations) is the recommended approach. It perturbs input words and observes which removals most change the model's output.
-
-```bash
-pip install lime
-```
-
-```python
-from lime.lime_text import LimeTextExplainer
-
-def predict_fn(texts):
-    # Batch inference — returns probabilities for each class
-    inputs = self._tokenizer(texts, return_tensors="pt", truncation=True,
-                              padding=True, max_length=512)
-    with torch.no_grad():
-        logits = self._model(**inputs).logits
-    return torch.softmax(logits, dim=-1).numpy()
-
-explainer = LimeTextExplainer(class_names=["pants-fire","false","barely-true","half-true","mostly-true","true"])
-explanation = explainer.explain_instance(text, predict_fn, num_features=10, labels=[0, 1])
-
-# Map LIME features to XAIAnnotation objects
-for word, weight in explanation.as_list(label=1):  # label 1 = "false"
-    ann_type = "manipulative" if weight > 0.05 else "verified" if weight < -0.05 else "neutral"
-    annotations.append(XAIAnnotation(text=word, type=ann_type,
-                                     reason=f"LIME weight: {weight:.3f}",
-                                     confidence=abs(weight) * 100))
-```
+**Core Capabilities:**
+1. **Sequence Classification Inference:** Evaluates text through `roberta-base` (or fine-tuned sequence classification checkpoints), mapping logits to calibrated credibility and AI probabilities.
+2. **Sentence-Level XAI Annotations:** Every sentence is classified into an explainable category:
+   - `manipulative`: Sensationalist clickbait tropes, emotional hyperbole, and absolutist words.
+   - `verified`: Attributed to accredited news institutions, recognized research bodies, or empirical data.
+   - `unverified`: Ambiguous or anonymous attribution (*"sources say"*, *"reports claim"*).
+   - `neutral`: Objective factual statements delivered in balanced journalistic prose.
+3. **Forensic Stylometric Metrics:**
+   - **Sentence Burstiness (Cadence):** Computes sentence length Coefficient of Variation ($CV = \frac{\sigma}{\mu}$). Documents with $CV \ge 0.30$ exhibit natural human variation. Samples with $\le 3$ sentences are calibrated as natural concise cadence to prevent false-positive penalties.
+   - **Vocabulary Richness (TTR):** Type-Token Ratio measuring lexical diversity ($TTR \ge 0.50$ indicates high diversity).
+   - **Factual Realism Check:** Scans against known pseudoscientific, satirical, and absurdity tropes (e.g., flat earth, moon cheese).
+   - **AI Stylometric Buzzwords:** Detects over 120 structural generative AI transition markers.
+4. **Ensemble Scoring:** For passages exhibiting high factual realism and rich vocabulary ($\ge 70.0$), an intelligent ensemble ($70\% \text{ heuristic} + 30\% \text{ transformer}$) ensures unusual or historical terminology is not penalized. When absurdity or deceptive clickbait is flagged ($\le 30.0$), a strict cap is enforced.
 
 ---
 
-### 2. Source Authority Scoring — `services/source.py`
+### 2. Source Authority Scoring & Anti-Spoofing — `services/source.py`
 
-**Goal:** Score the credibility of the publisher/domain on a 0–100 scale.
+**Goal:** Evaluate publisher credibility, institutional transparency, and prevent text attribution spoofing.
 
-**Step 1 — Domain extraction from URLs**
-
-```python
-from urllib.parse import urlparse
-domain = urlparse(url).netloc.lower().removeprefix("www.")
-# e.g. "bbc.com", "unknownblog.net"
-```
-
-**Step 2 — MediaBias/FactCheck database lookup**
-
-Download the community-maintained MBFC dataset from:
-https://github.com/ramaboo/mbfc-data
-
-Load it at startup as a pandas DataFrame indexed by domain for O(1) lookups:
-
-```python
-import pandas as pd
-self._mbfc = pd.read_csv("data/mbfc.csv")
-# Columns: domain, bias_rating, factual_reporting, credibility_rating
-
-def _lookup_domain(self, domain: str) -> float:
-    row = self._mbfc[self._mbfc["domain"].str.contains(domain, na=False)]
-    if row.empty:
-        return self._fallback_score(domain)
-    factual = row.iloc[0]["factual_reporting"]  # "HIGH", "MIXED", "LOW", etc.
-    return {"HIGH": 90, "MOSTLY FACTUAL": 75, "MIXED": 50, "LOW": 25, "VERY LOW": 10}.get(factual, 50)
-```
-
-**Step 3 — Fallback domain scoring**
-
-For domains not in MBFC, compute a heuristic score from:
-- Domain age (older = more credible): via WHOIS API
-- HTTPS presence
-- Has an editorial/about/contact page
-
-```python
-import httpx
-
-async def _fallback_score(self, domain: str) -> float:
-    score = 30  # start low for unknown domains
-    async with httpx.AsyncClient(timeout=5) as client:
-        try:
-            r = await client.get(f"https://{domain}", follow_redirects=True)
-            if r.status_code == 200:
-                score += 10
-            if "contact" in r.text.lower() or "about" in r.text.lower():
-                score += 10
-        except Exception:
-            pass
-    return min(score, 60)  # cap unknown domains at 60
-```
+**Core Capabilities:**
+1. **100+ Publisher & Domain Registry (`KNOWN_SOURCES`):**
+   - **Primary Wire Services (94–98%):** Reuters, Associated Press, Agence France-Presse, Bloomberg News, Dow Jones.
+   - **Global Quality Press (88–94%):** BBC News, The New York Times, The Washington Post, Wall Street Journal, Financial Times, The Guardian, NPR, PBS NewsHour, Deutsche Welle, France 24.
+   - **South African & African Media (85–92%):** Daily Maverick, News24, Mail & Guardian, Business Day, Sunday Times, SABC News, Eyewitness News (EWN), TechCentral, AllAfrica.
+   - **Certified Fact-Checkers (94–98%):** Africa Check, Snopes, PolitiFact, FactCheck.org, Full Fact, Lead Stories.
+   - **Authoritative Scientific Journals (92–98%):** Nature Journal, Science Magazine, MIT Technology Review, Scientific American, Ars Technica.
+   - **Encyclopedic Knowledge Bases (90–95%):** Wikipedia Knowledge Base (`wikipedia.org`, `en.wikipedia.org` = 90.0), Encyclopaedia Britannica (`britannica.com` = 95.0).
+   - **Questionable & Satirical Outlets (10–35%):** InfoWars, Natural News, The Gateway Pundit, Breitbart, RT, Sputnik, The Onion, The Babylon Bee.
+2. **Anti-Spoofing Attribution Framing:** Prevents authors of fake news from inflating credibility by incidental name-dropping. The engine requires verified reporting syntax (e.g., `"according to Reuters"`, `"BBC confirmed"`, `"spokesperson for Associated Press"`). Incidental mentions default to a neutral 65.0 cap.
+3. **Discovered Source Authority Bridging:** When pasted text or document uploads lack an explicit byline, authoritative sources discovered through claim corroboration (e.g. Wikipedia Knowledge Base, Encyclopaedia Britannica, major wire services) are automatically bridged into the source authority evaluation, raising the source score from a generic baseline to 89–95%.
+4. **Dynamic Fallback Domain Probing:** Unknown URLs are safely probed (after SSRF validation) for SSL certificates, editorial mastheads, corrections policies, and contact transparency, capped at a maximum of 58.0.
 
 ---
 
-### 3. External Corroboration — `services/corroboration.py`
+### 3. Multi-Source Corroboration & Stance Detection — `services/corroboration.py`
 
-**Goal:** Extract factual claims from the text and cross-reference each one against the News API.
+**Goal:** Extract declarative claims from text and cross-reference them in real time across external fact-checkers, news feeds, search indexes, and encyclopedias.
 
-**Step 1 — Register for a free News API key**
-
-Go to https://newsapi.org/register and add the key to `.env` as `NEWS_API_KEY`.
-
-**Step 2 — Claim extraction**
-
-Use sentence segmentation + a zero-shot NLI model to identify declarative factual claims:
-
-```python
-import spacy
-nlp = spacy.load("en_core_web_sm")
-
-def _extract_claims(self, text: str) -> list[str]:
-    doc = nlp(text)
-    claims = []
-    for sent in doc.sents:
-        # Keep declarative sentences with a subject and main verb
-        has_nsubj = any(tok.dep_ == "nsubj" for tok in sent)
-        if has_nsubj and len(sent.text.split()) > 5:
-            claims.append(sent.text.strip())
-    return claims[:5]  # limit to 5 claims per request (API rate limits)
-```
-
-**Step 3 — News API query**
-
-```python
-import httpx
-
-async def _verify_claim(self, claim: str) -> ClaimResult:
-    # Extract 3-5 keywords from the claim (use spaCy NER or simple noun phrases)
-    keywords = " ".join([tok.text for tok in nlp(claim) if tok.pos_ in ("NOUN","PROPN")])[:100]
-
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get("https://newsapi.org/v2/everything", params={
-            "q": keywords,
-            "language": "en",
-            "sortBy": "relevancy",
-            "pageSize": 5,
-            "apiKey": settings.news_api_key,
-        })
-    articles = resp.json().get("articles", [])
-    confidence = min(len(articles) * 18, 95)  # crude: more articles = higher confidence
-    status = "verified" if len(articles) >= 3 else "unverified"
-    return ClaimResult(claim=claim, status=status, confidence=confidence, sources=len(articles))
-```
-
-**Step 4 — Semantic similarity (optional but improves accuracy)**
-
-```bash
-pip install sentence-transformers
-```
-
-```python
-from sentence_transformers import SentenceTransformer, util
-
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
-
-def _is_semantically_similar(self, claim: str, article_title: str, threshold=0.45) -> bool:
-    embs = embedder.encode([claim, article_title], convert_to_tensor=True)
-    return util.cos_sim(embs[0], embs[1]).item() > threshold
-```
+**Core Capabilities:**
+1. **Smart Topic Query Formulation (`_extract_queries`):**
+   - Extracts numeric and date anchors (e.g. `1932`).
+   - Extracts deduplicated proper actor entities (e.g. `Australian`, `Western Australia`, `Lewis`).
+   - Extracts substantive topic nouns (e.g. `emus`, `machine guns`, `wheat crops`) without restrictive double quotation marks that limit search recall.
+   - Generates high-recall keyword bags (e.g. `1932 Australian emus Lewis machine guns`).
+2. **Multi-Source Concurrent Verification (`asyncio.gather`):**
+   - **Google Fact Check Tools API:** Directly queries ratings from International Fact-Checking Network (IFCN) signatories.
+   - **Google News RSS Feed:** Live index of accredited international press coverage.
+   - **DuckDuckGo Organic Search:** Live web search with browser headers for organic press archives.
+   - **News API Everything Endpoint:** Live news coverage with entity fallback.
+   - **Wikipedia Knowledge Base:** Queries Wikipedia Action API with `prop=extracts&exintro=1&explaintext=1` to retrieve complete introductory sections.
+3. **Stance & Refutation Detection:**
+   - Detects refutation markers (`"false"`, `"debunked"`, `"hoax"`, `"unfounded"`, `"pants on fire"`) to classify debunked viral rumors as `false` with 85–96% confidence, attaching direct citations to the debunking articles.
+   - Recognizes affirmative reporting and marks corroborated assertions as `verified` (78–96% confidence).
+4. **Semantic Overlap & Subject/Actor Anchoring (`_is_claim_relevant`):**
+   - Enforces morphological stemming and non-entity substantive overlap.
+   - Validates subject/actor anchoring: candidate press reports must contain the primary actor or key topic nouns (e.g. matching `Australia` + `emu`), preventing third-party news or unrelated hoaxes from contaminating the verification verdict.
+5. **Intra-Document Context Propagation:**
+   - Extracts document-level context terms. If a lead sentence matches an authoritative encyclopedic record (e.g. `Emu War`), the introductory context is cached and evaluated against subsequent sentences in the same passage.
 
 ---
 
@@ -707,6 +568,12 @@ Cross-references claims across Google Fact Check Tools API (certified fact-check
 
 ### 7. Comprehensive Source Registry & Anti-Spoofing
 Registry of 100+ global, South African, and African publishers, certified fact-checkers, and questionable domains. Enforces journalistic attribution framing to prevent source authority spoofing via incidental name-dropping.
+
+### 8. Two-Tier Role-Based Access Control (PoLP RBAC) & Disaster Recovery
+Implements strict Principle of Least Privilege role separation distinguishing Operational Administrators (`admin`) from Super Administrators (`superadmin`). Operational admins manage commercial user tiers, perform account moderation, and inspect telemetry and audit logs, while root actions (destructive database snapshot restorations, active learning model retraining triggers, and administrator promotion/demotion) are strictly gated under `require_superadmin`. Administrative accounts are safeguarded with lockout prevention against commercial self-service subscription modifications.
+
+### 9. Transactional Email & Two-Factor OTP Authentication (SMTP / 2FA)
+Integrates standard SMTP transactional email delivery (supporting Gmail SMTP, Outlook, or institutional relays) with single-use 6-digit cryptographic OTP verification. Mandates pre-account verification during signup so unverified emails never persist in MongoDB, and enforces 2FA challenges during sign-in. Incorporates a Break-Glass Root Access Policy granting `superadmin@veritas.ai` direct password sign-in without external email dependencies, paired with automatic development environment console logging for offline examiner defense sessions.
 
 ---
 

@@ -1,6 +1,88 @@
-<svg width="1248" height="1248" viewBox="0 0 1248 1248" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M547.174 323.019C561.117 322.358 579.731 322.872 594.108 322.869L678.521 323.02C668.85 333.352 657.199 344.375 647.053 354.353L597.495 403.338L447.617 552.88L398.695 601.768C391.008 609.399 378.552 620.929 371.643 628.832L504.07 781.188C516.631 795.57 529.771 811.371 542.456 825.405C548.159 819.146 557.805 807.989 563.913 802.748C576.611 802.041 595.665 802.626 608.836 802.638C631.69 802.486 654.542 802.535 677.393 802.791C673.774 808.915 667.113 815.301 662.098 820.639L641.788 842.382C617.205 868.926 592.41 896.5 567.625 922.703L533.756 959.461C529.108 955.61 521.387 947.389 516.936 942.916L484.992 910.729L366.316 791.865L332.545 757.892C328.116 753.401 315.917 740.47 311.395 736.978C298.707 727.185 281.709 717.155 267.901 708.258L178.052 650.593C171.909 646.663 148.531 632.818 145.259 629.692C146.213 626.011 169.33 615.121 174.328 612.452L233.289 581.235L312.609 539.267C320.486 535.02 332.638 529.079 339.77 524.709C343.494 522.426 355.503 510.2 359.423 506.355L392.715 473.702L496.399 372.58C512.002 357.348 531.365 336.851 547.174 323.019Z" fill="#035AE2"/>
+<svg width="512" height="512" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer Obsidian Shield Container with Elevation Shadow -->
+  <filter id="shieldShadow" x="4" y="4" width="112" height="116" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.25"/>
+  </filter>
 
-<path d="M717.009 322.156C718.538 322.292 719.757 322.158 720.915 323.31C745.077 347.323 770.549 372.319 794.564 396.284L892.661 494.259C901.235 502.761 925.086 528.288 933.91 533.601C945.262 540.436 965.043 550.74 977.218 557.411L1062.73 604.561C1070.45 608.839 1097.48 623.092 1103.04 627.473C1103.28 630.843 1100.92 632.08 1098.23 633.768C1090.96 638.357 1083.18 642.348 1075.89 646.882C1050.54 662.89 1025.36 679.173 1000.36 695.723C991.088 701.921 941.515 736.521 934.97 738.526C929.839 731.865 925.086 724.864 919.852 718.118C867.933 773.736 816.91 830.17 766.795 887.415L727.789 931.308C722.78 937.048 706.418 956.743 701.305 960.387C684.785 960.716 667.217 960.412 650.611 960.412C622.909 960.448 591.405 961.204 564.024 960.223C570.234 952.654 578.47 944.062 585.129 936.713L630.478 886.994C677.753 835.008 722.835 785.771 772.444 735.906L841.687 666.315L863.649 644.377C867.433 640.575 872.869 635.529 875.861 631.312C824.204 570.462 772.206 509.909 719.861 449.653C715.266 454.474 707.113 463.285 701.878 466.721C693.798 467.257 683.926 466.873 675.724 466.871C658.149 466.912 640.575 466.835 623.001 466.641C608.238 466.566 583.671 467.767 570.657 466.137C578.101 460.243 597.288 439.762 605.036 432.122L685.681 352.521C692.597 345.735 710.44 326.893 717.009 322.156Z" fill="#AACCF3"/>
-<path d="M649.838 495.948L650.179 496.24C651.373 498.911 651.056 717.052 650.685 738.617L597.264 778.221L596.853 777.843C596.27 774.759 596.52 756.545 596.52 752.45L596.511 696.101L596.507 589.534C596.504 573.791 595.681 550.619 596.628 535.633C603.434 529.8 615.268 521.484 622.739 515.828C630.319 510.089 642.117 500.744 649.838 495.948Z" fill="#035AE2"/>
+  <g filter="url(#shieldShadow)">
+    <!-- Base Shield -->
+    <path
+      d="M60 10L18 24V54C18 78 36 99.5 60 106C84 99.5 102 78 102 54V24L60 10Z"
+      fill="url(#obsidianGrad)"
+      stroke="url(#borderGlow)"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- High-Tech Internal Grid / Radar Arc Accents -->
+  <path
+    d="M32 46C32 63.5 44 79 60 84C76 79 88 63.5 88 46"
+    stroke="#1E293B"
+    stroke-width="1.5"
+    stroke-dasharray="3 3"
+  />
+
+  <!-- The Veritas 'V' Multi-Dimensional Prism -->
+  <!-- Left Wing (Linguistic NLP): Electric Azure to Royal Cobalt -->
+  <path
+    d="M34 32L60 76V56L44 30L34 32Z"
+    fill="url(#blueWing)"
+  />
+  <path
+    d="M34 32L44 30L60 56V64L34 32Z"
+    fill="#60A5FA"
+    fill-opacity="0.9"
+  />
+
+  <!-- Right Wing (Source Authority & Corroboration): Emerald to Cyan -->
+  <path
+    d="M86 32L60 76V56L76 30L86 32Z"
+    fill="url(#emeraldWing)"
+  />
+  <path
+    d="M86 32L76 30L60 56V64L86 32Z"
+    fill="#34D399"
+    fill-opacity="0.9"
+  />
+
+  <!-- Central Convergence Diamond / Focal Lens (Pure White Truth Core) -->
+  <polygon
+    points="60,20 69,33 60,44 51,33"
+    fill="#FFFFFF"
+  />
+  <polygon
+    points="60,24 65,33 60,40 55,33"
+    fill="#0284C7"
+  />
+  <circle cx="60" cy="33" r="2" fill="#FFFFFF" />
+
+  <!-- Gradients & Defs -->
+  <defs>
+    <!-- Deep Obsidian Shield Gradient -->
+    <linearGradient id="obsidianGrad" x1="60" y1="10" x2="60" y2="106" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B0F19" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <!-- Border Glow with Subtle Top Cyan/Blue Sheen -->
+    <linearGradient id="borderGlow" x1="18" y1="10" x2="102" y2="106" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="35%" stop-color="#2563EB" />
+      <stop offset="70%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+
+    <!-- Left Wing Gradient -->
+    <linearGradient id="blueWing" x1="34" y1="30" x2="60" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+
+    <!-- Right Wing Gradient -->
+    <linearGradient id="emeraldWing" x1="86" y1="30" x2="60" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
 </svg>

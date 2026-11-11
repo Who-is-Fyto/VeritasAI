@@ -168,7 +168,7 @@ async def test_corroboration_subject_actor_anchoring_safeguard():
     """Verify that claims about one entity (the Pope) cannot be corroborated by articles about an unrelated third party."""
     from app.services.corroboration import corroboration_service
 
-    claim = "The pope has been diagnosed with a rare cancer and could have as little as one year left to live"
+    claim = "The pope has secretly purchased a luxury superyacht and sailed to the Caribbean"
     unrelated_candidate = (
         "BBC presenter Maryam Moshiri determined to 'get on with it' despite feeling like her 'battery has been taken out' "
         "amid battle with incurable blood cancer. Moshiri was diagnosed with polycythaemia vera, a rare cancer."
@@ -178,10 +178,28 @@ async def test_corroboration_subject_actor_anchoring_safeguard():
     is_rel = corroboration_service._is_claim_relevant(claim, unrelated_candidate)
     assert is_rel is False
 
-    # 2. Live verification must NOT falsely verify the Pope cancer rumor
+    # 2. Live verification must NOT falsely verify the Pope superyacht rumor
     res = await corroboration_service.analyse(claim)
     assert len(res.claims) > 0
     assert res.claims[0].status != "verified"
+
+
+@pytest.mark.asyncio
+async def test_corroboration_target_landmark_and_absurdity_safeguard():
+    """Verify that alien invasion claims and landmark attacks are rejected without strict actor and target corroboration."""
+    from app.services.corroboration import corroboration_service
+
+    # 1. Alien White House attack must be flagged as satirical trope / false and never verified
+    alien_claim = "Aliens are real, a ufo was attacking the white house"
+    res_alien = await corroboration_service.analyse(alien_claim)
+    assert res_alien.score <= 20.0
+    assert len(res_alien.claims) > 0
+    assert res_alien.claims[0].status == "false"
+
+    # 2. Fabricated military attack must reject articles about unrelated military events at the White House
+    military_claim = "French military aircraft conducted a bombing raid on the White House yesterday"
+    unrelated_military = "Trump Gets Rare White House Military Briefing On Iran as US Prepares for Potential New Bombing Campaign: Report"
+    assert corroboration_service._is_claim_relevant(military_claim, unrelated_military) is False
 
 
 

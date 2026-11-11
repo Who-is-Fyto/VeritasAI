@@ -53,12 +53,13 @@ graph LR
 
 ### 1. Sentence Burstiness (Cadence):
 Human writers naturally vary sentence length (short punchy sentences followed by compound structures). LLMs typically produce uniform sentence lengths. We compute the Coefficient of Variation ($CV = \frac{\sigma}{\mu}$) of sentence lengths:
-- $CV < 0.25$: Monotonous uniform cadence (+35% AI probability)
-- $CV \ge 0.35$: Natural human cadence
+- For passages with $> 3$ sentences: $CV < 0.30$ triggers "Monotonous uniform cadence" (+35% AI probability), while $CV \ge 0.30$ indicates "Natural human cadence".
+- For short snippets ($\le 3$ sentences): small sample sizes naturally have low variance. The system identifies them as "Natural concise cadence" (`ok=True`), preventing false-positive AI cadence penalties on 1–3 sentence paragraphs.
 
 ### 2. Vocabulary Richness (TTR):
 The Type-Token Ratio ($TTR = \frac{\text{Unique Words}}{\text{Total Words}}$) measures vocabulary variation:
 - $TTR < 0.45$ in texts $> 50$ words (+25% AI probability)
+- $TTR \ge 0.50$: High lexical diversity
 
 ### 3. Shannon Lexical Entropy:
 Measures the information density and randomness of token choices:
@@ -67,6 +68,23 @@ $$H = -\sum_{i} P(w_i) \log_2 P(w_i)$$
 
 ### 4. LLM Buzzword Frequency:
 Tracks overused generative AI phrasing (*"delve into"*, *"tapestry of"*, *"testament to"*, *"crucial role"*, *"navigating the complex"*, *"in summary"*, *"multifaceted"*, *"beacon of"*, *"game-changer"*, *"paradigm shift"*, *"seamlessly integrate"*). Each detected marker increments the AI probability score.
+
+---
+
+## 4. Hybrid Ensemble Scoring Architecture
+
+In the initial implementation, `linguistic.py` took `min(model_score, heuristic_res.score)` unconditionally. When analyzing factual historical events (such as the 1932 Australian Emu War), military and conflict terminology ("Lewis machine guns", "combat", "humiliating defeat") triggered false-positive sensationalism in raw sequence classification models, dragging an otherwise natural, factual prose style down to 19.2%.
+
+### Calibrated Ensemble Decision Matrix:
+1. **Overt Absurdity or Clickbait ($S_{\text{heuristic}} \le 30.0$):**
+   If the heuristic engine flags satirical tropes (e.g., flat earth, moon cheese) or heavy manipulative framing, a strict minimum cap is applied:
+   $$\text{Final Score} = \min(S_{\text{model}}, S_{\text{heuristic}})$$
+2. **High Factual Realism & Rich Vocabulary ($S_{\text{heuristic}} \ge 70.0$):**
+   If the text passes factual realism checks, possesses high lexical diversity ($TTR \ge 0.55$), and contains no manipulative buzzwords, an explainable ensemble is applied:
+   $$\text{Final Score} = 0.70 \times S_{\text{heuristic}} + 0.30 \times S_{\text{model}}$$
+   This preserves high credibility (~68–75%) on authentic historical prose while maintaining neural sensitivity.
+3. **Neutral / Balanced Text ($30.0 < S_{\text{heuristic}} < 70.0$):**
+   $$\text{Final Score} = 0.60 \times S_{\text{heuristic}} + 0.40 \times S_{\text{model}}$$
 
 ---
 

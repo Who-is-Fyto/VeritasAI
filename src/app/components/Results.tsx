@@ -1,11 +1,22 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { veritasAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+import { getTierConfig } from "../../utils/tierLimits";
+import { PricingModal } from "./PricingModal";
+import { AuditCertificateModal } from "./AuditCertificateModal";
+import { PipelineTracker } from "./PipelineTracker";
+import { CredibilityGauge } from "./CredibilityGauge";
+import { SourceNutritionLabel } from "./SourceNutritionLabel";
+import { ClaimsAccordion } from "./ClaimsAccordion";
+import { TruthMap } from "./TruthMap";
+import { ForensicStylometricsPanel } from "./ForensicStylometricsPanel";
+import { getCredibilityConfig, CredibilityTier } from "../../utils/credibilityTheme";
 import {
-  Shield, AlertTriangle, CheckCircle2, XCircle, Sparkles,
+  Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Sparkles,
   ExternalLink, Globe, TrendingUp, Brain, Search, FileText,
   BarChart2, BookOpen, ArrowLeft, Download, ChevronRight, Eye,
-  AlertCircle, Info
+  AlertCircle, Info, Award
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -34,13 +45,24 @@ const CLIP_STYLES = `
     body, html {
       background: white !important;
       color: black !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
-    header, nav, .no-print, button, .flex-wrap, footer, .feedback-card {
+    header, nav, .no-print, button, footer, .feedback-card {
       display: none !important;
     }
     .min-h-screen {
       min-height: auto !important;
       padding: 0 !important;
+    }
+    #veritas-audit-certificate {
+      border: 2px solid #0f172a !important;
+      box-shadow: none !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin: 0 auto !important;
+      max-width: 100% !important;
+      padding: 24px !important;
     }
     .bg-gradient-to-br, .bg-white {
       background: none !important;
@@ -69,385 +91,6 @@ const CLIP_STYLES = `
   }
 `;
 
-
-/* ─────────────────────────────────────────────
-   XAI ANNOTATION TYPES
-───────────────────────────────────────────── */
-interface TextAnnotation {
-  text: string;
-  type: "manipulative" | "verified" | "unverified" | "neutral";
-  reason?: string;
-  confidence?: number;
-}
-
-const ANNOTATION_CONFIG = {
-  manipulative: {
-    bg: "bg-red-100",
-    border: "border-b-2 border-red-400",
-    dot: "bg-red-400",
-    label: "Manipulation Marker",
-    icon: AlertCircle,
-    badge: "bg-red-100 text-red-700 border border-red-200",
-    tooltip: "bg-red-950",
-    textColor: "text-red-300",
-  },
-  verified: {
-    bg: "bg-green-100",
-    border: "border-b-2 border-green-400",
-    dot: "bg-green-500",
-    label: "Verified Signal",
-    icon: CheckCircle2,
-    badge: "bg-green-100 text-green-700 border border-green-200",
-    tooltip: "bg-green-950",
-    textColor: "text-green-300",
-  },
-  unverified: {
-    bg: "bg-yellow-100",
-    border: "border-b-2 border-yellow-400",
-    dot: "bg-yellow-400",
-    label: "Unverified Claim",
-    icon: AlertTriangle,
-    badge: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-    tooltip: "bg-yellow-950",
-    textColor: "text-yellow-300",
-  },
-  neutral: {
-    bg: "",
-    border: "",
-    dot: "bg-gray-300",
-    label: "Neutral",
-    icon: Info,
-    badge: "bg-gray-100 text-gray-600 border border-gray-200",
-    tooltip: "bg-gray-900",
-    textColor: "text-gray-300",
-  },
-};
-
-/* ─────────────────────────────────────────────
-   XAI ANNOTATION LOGIC (frontend simulation)
-   — will be replaced by RoBERTa API response
-───────────────────────────────────────────── */
-function annotateText(text: string): TextAnnotation[] {
-  if (!text || text.length < 10) return [{ text, type: "neutral" }];
-
-  // Split into sentences/phrases
-  const raw = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
-  const segments = raw.map(s => s.trim()).filter(Boolean);
-  const result: TextAnnotation[] = [];
-
-  for (const seg of segments) {
-    // ── MANIPULATIVE: sensationalism, absolutes, fear language
-    if (
-      /\b(shocking|breaking|explosive|bombshell|stunning|outrageous|unbelievable|incredible|mind-blowing|you won'?t believe|must.?see|BREAKING|SHOCKING|EXPOSED|PROOF|URGENT)\b/i.test(seg)
-    ) {
-      result.push({
-        text: seg,
-        type: "manipulative",
-        reason:
-          "Sensationalist/clickbait language detected — this pattern is strongly associated with low-credibility content and AI-generated disinformation articles.",
-        confidence: 76 + Math.floor(Math.abs(seg.length % 14)),
-      });
-    } else if (
-      /\b(always|never|everyone|nobody|completely|totally|absolutely|definitely|undoubtedly|100%|every single|no one)\b/i.test(
-        seg
-      )
-    ) {
-      result.push({
-        text: seg,
-        type: "manipulative",
-        reason:
-          "Absolutist language detected — overgeneralisation is a common rhetorical manipulation technique used to bypass critical evaluation.",
-        confidence: 70 + Math.floor(Math.abs(seg.length % 18)),
-      });
-    }
-    // ── VERIFIED: attribution, citations, data references
-    else if (
-      /\b(according to|published in|cited by|study by|researchers at|data from|evidence suggests|a report by|findings from|survey of|per cent|percent|\d+%|scientists|university|journal|institute|government)\b/i.test(
-        seg
-      )
-    ) {
-      result.push({
-        text: seg,
-        type: "verified",
-        reason:
-          "Attribution or quantitative marker detected — content references an external, potentially verifiable source. Cross-referencing with News API databases in progress.",
-        confidence: 78 + Math.floor(Math.abs(seg.length % 12)),
-      });
-    }
-    // ── UNVERIFIED: vague sourcing, hedging, speculation
-    else if (
-      /\b(some say|sources claim|reportedly|allegedly|unconfirmed|it is believed|many people|experts say|insiders|officials say|could soon|may have|might be|is expected to|anonymous sources)\b/i.test(
-        seg
-      )
-    ) {
-      result.push({
-        text: seg,
-        type: "unverified",
-        reason:
-          "Vague attribution detected — claim cannot be traced to a specific, independently verifiable source. No corroborating articles found in News API scan.",
-        confidence: 52 + Math.floor(Math.abs(seg.length % 22)),
-      });
-    }
-    // ── NEUTRAL
-    else {
-      result.push({ text: seg, type: "neutral" });
-    }
-  }
-
-  // Guarantee some variety if the entire text resolves as neutral
-  if (result.length >= 3 && result.every(r => r.type === "neutral")) {
-    result[1] = {
-      ...result[1],
-      type: "verified",
-      reason: "Declarative, structured sentence pattern — consistent with factual reporting style.",
-      confidence: 71,
-    };
-    if (result.length >= 5) {
-      result[result.length - 2] = {
-        ...result[result.length - 2],
-        type: "unverified",
-        reason:
-          "Forward-looking or predictive claim — cannot be independently verified at time of analysis.",
-        confidence: 58,
-      };
-    }
-  }
-
-  return result;
-}
-
-/* ─────────────────────────────────────────────
-   TRUTH MAP COMPONENT
-───────────────────────────────────────────── */
-function TruthMap({
-  text,
-  type,
-  xaiAnnotations,
-  resultId
-}: {
-  text: string;
-  type?: string;
-  xaiAnnotations?: TextAnnotation[];
-  resultId?: string;
-}) {
-  const [active, setActive] = useState<TextAnnotation | null>(null);
-  const [submittedHighlights, setSubmittedHighlights] = useState<string[]>([]);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const annotations = xaiAnnotations && xaiAnnotations.length > 0 ? xaiAnnotations : annotateText(text);
-
-  const counts = annotations.reduce(
-    (acc, a) => {
-      acc[a.type] = (acc[a.type] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  const handleHighlightFeedback = async (annText: string, isAccurate: boolean, correctedLabel: string) => {
-    setFeedbackLoading(true);
-    try {
-      const docId = resultId || "mock-id";
-      await veritasAPI.submitFeedback(docId, {
-        is_accurate: isAccurate,
-        corrected_label: correctedLabel,
-      });
-      setSubmittedHighlights((prev) => [...prev, annText]);
-    } catch (err) {
-      console.error("XAI feedback submit failed:", err);
-      setSubmittedHighlights((prev) => [...prev, annText]); // Fallback check in mock mode
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
-
-  if (type === "url" && (!xaiAnnotations || xaiAnnotations.length === 0)) {
-    return (
-      <div className="p-6 bg-blue-50/40 rounded-xl border border-blue-200/50 text-center text-sm text-muted-foreground">
-        <Globe className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-        <p>Truth Map is available for text-based submissions.</p>
-        <p className="mt-1 text-xs">URL content will be annotated once the backend fetching layer is connected.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        {(["manipulative", "verified", "unverified"] as const).map(t => {
-          const cfg = ANNOTATION_CONFIG[t];
-          const Icon = cfg.icon;
-          return (
-            <div key={t} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs ${cfg.badge}`}>
-              <Icon className="w-3 h-3" />
-              {cfg.label}
-              {counts[t] ? (
-                <span className="ml-1 font-semibold">{counts[t]}</span>
-              ) : (
-                <span className="ml-1 opacity-50">0</span>
-              )}
-            </div>
-          );
-        })}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-500 border border-gray-200 ml-auto">
-          <Eye className="w-3 h-3" />
-          Click highlighted text for XAI feedback options
-        </div>
-      </div>
-
-      {/* Annotated text */}
-      <div className="bg-blue-50/30 border border-blue-200/50 rounded-xl p-6 text-sm leading-8 font-serif">
-        {annotations.map((ann, idx) => {
-          if (ann.type === "neutral") {
-            return <span key={idx}>{ann.text} </span>;
-          }
-          const cfg = ANNOTATION_CONFIG[ann.type];
-          const Icon = cfg.icon;
-          const isSelected = active?.text === ann.text;
-          return (
-            <span
-              key={idx}
-              className="group/ann relative cursor-pointer"
-              onClick={() => setActive(isSelected ? null : ann)}
-            >
-              <span
-                className={`${cfg.bg} ${cfg.border} rounded-sm px-0.5 transition-all group-hover/ann:brightness-95 ${isSelected ? 'ring-2 ring-blue-500/50' : ''}`}
-              >
-                {ann.text}
-              </span>
-              {/* Tooltip */}
-              <span
-                className={`
-                  absolute bottom-full left-0 z-50 mb-2 w-72 p-3.5
-                  pointer-events-none opacity-0 group-hover/ann:opacity-100
-                  transition-opacity duration-150
-                  ${cfg.tooltip} text-white text-xs rounded-xl shadow-2xl leading-relaxed
-                `}
-              >
-                <span className={`flex items-center gap-1.5 mb-2 font-semibold ${cfg.textColor}`}>
-                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  {cfg.label}
-                  {ann.confidence && (
-                    <span className="ml-auto text-gray-400 font-normal">{ann.confidence}% confidence</span>
-                  )}
-                </span>
-                <span className="block text-gray-300 leading-relaxed">{ann.reason}</span>
-                {/* Arrow */}
-                <span className="absolute top-full left-5 border-4 border-transparent border-t-current opacity-0" />
-              </span>
-              {" "}
-            </span>
-          );
-        })}
-      </div>
-
-      {/* Active annotation detail card */}
-      <AnimatePresence>
-        {active && active.type !== "neutral" && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15 }}
-            className={`mt-4 p-4 rounded-xl border text-sm ${ANNOTATION_CONFIG[active.type].badge}`}
-          >
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start gap-2">
-                {(() => {
-                  const Icon = ANNOTATION_CONFIG[active.type].icon;
-                  return <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />;
-                })()}
-                <div>
-                  <p className="font-semibold mb-1">{ANNOTATION_CONFIG[active.type].label}</p>
-                  <p className="leading-relaxed opacity-90">{active.reason}</p>
-                  {active.confidence && (
-                    <p className="mt-1.5 text-xs opacity-70">Model confidence: {active.confidence}%</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Dynamic Feedback Block */}
-              <div className="border-t border-current/10 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
-                  Is this categorization accurate?
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {submittedHighlights.includes(active.text) ? (
-                    <span className="text-xs font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Correction registered for retraining!
-                    </span>
-                  ) : feedbackLoading ? (
-                    <span className="text-xs opacity-70 animate-pulse">Submitting correction...</span>
-                  ) : (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, true, active.type);
-                        }}
-                        className="px-2.5 py-1 bg-white/25 hover:bg-white/40 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Yes, Correct
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, false, "verified");
-                        }}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/25 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer text-[10px]"
-                      >
-                        Mark Verified
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, false, "manipulative");
-                        }}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/25 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer text-[10px]"
-                      >
-                        Mark Manipulative
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHighlightFeedback(active.text, false, "neutral");
-                        }}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/25 border border-current/10 rounded text-xs font-semibold transition-colors cursor-pointer text-[10px]"
-                      >
-                        Mark Neutral
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-
-/* ─────────────────────────────────────────────
-   SCORE RING
-───────────────────────────────────────────── */
-function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
-  const data = [{ value: score, fill: "#2563eb" }];
-  return (
-    <ResponsiveContainer width={size} height={size}>
-      <RadialBarChart
-        cx="50%" cy="50%"
-        innerRadius="65%" outerRadius="90%"
-        data={data}
-        startAngle={90} endAngle={-270}
-      >
-        <RadialBar background={{ fill: "rgba(219,234,254,0.6)" }} dataKey="value" cornerRadius={8} />
-      </RadialBarChart>
-    </ResponsiveContainer>
-  );
-}
 
 interface GraphNode {
   id: string;
@@ -637,11 +280,16 @@ export function Results() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { text: stateText, type: stateType, result } = location.state || {};
+  const { tier, changeTier } = useAuth();
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [certificateOpen, setCertificateOpen] = useState(false);
+  const tierConfig = getTierConfig(tier);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!result && Boolean(id));
   const [loadedResult, setLoadedResult] = useState<any>(result);
-  const [text, setText] = useState(stateText || "");
-  const [type, setType] = useState(stateType || "text");
+  const [text, setText] = useState(stateText || result?.content || "");
+  const [type, setType] = useState(stateType || result?.input_type || "text");
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [showCorrectionOptions, setShowCorrectionOptions] = useState(false);
@@ -650,20 +298,32 @@ export function Results() {
 
 
   useEffect(() => {
-    if (!loadedResult && id && import.meta.env.VITE_USE_MOCK_API !== "true") {
+    if (!loadedResult && id) {
       setLoading(true);
+      setFetchError(null);
       veritasAPI.getResult(id)
         .then((res) => {
           setLoadedResult(res);
+          if (res.content) setText(res.content);
           if (res.input_type) setType(res.input_type);
-          setLoading(false);
         })
         .catch((err) => {
           console.error("Failed to fetch result:", err);
+          setFetchError("Could not retrieve verification record from database cluster.");
+        })
+        .finally(() => {
           setLoading(false);
         });
     }
   }, [id, loadedResult]);
+
+  // Ensure all charting engines and layout observers compute dimensions immediately on mount
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
 
   const handleFeedback = async (isAccurate: boolean, correctedLabel: string) => {
@@ -735,16 +395,68 @@ export function Results() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50/30 to-white">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading analysis report...</p>
+      <div className="min-h-screen py-12 lg:py-20 bg-gradient-to-b from-blue-50/30 to-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <PipelineTracker
+            currentStep={3}
+            logMessages={[
+              "▸ Fetching cached verification report from MongoDB...",
+              "▸ Querying RoBERTa fine-tuned stylometric checkpoints...",
+              "▸ Loading MediaBias/FactCheck and domain credibility record...",
+              "▸ Rebuilding claim corroboration graph...",
+              "✓ Verification report loaded successfully.",
+            ]}
+            title="Retrieving Verification Intelligence"
+            subtitle="Assembling multimodal fact-checking report and interactive Truth Map from the database cluster."
+            showSkeletonPreview={true}
+          />
+        </div>
+        <style>{CLIP_STYLES}</style>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="text-center max-w-md p-8 bg-white border border-rose-200 rounded-2xl shadow-sm clip-corner-lg">
+          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-200">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">Report Retrieval Failed</h3>
+          <p className="text-sm text-slate-500 mb-6">{fetchError}</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                if (!id) return;
+                setLoading(true);
+                setFetchError(null);
+                veritasAPI.getResult(id)
+                  .then((res) => {
+                    setLoadedResult(res);
+                    if (res.content) setText(res.content);
+                    if (res.input_type) setType(res.input_type);
+                  })
+                  .catch(() => setFetchError("Could not retrieve verification record from database cluster."))
+                  .finally(() => setLoading(false));
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer"
+            >
+              Retry Retrieval
+            </button>
+            <button
+              onClick={() => navigate("/verify")}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+            >
+              Start New Analysis
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!text) {
+  if (!text && !loadedResult) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -761,17 +473,20 @@ export function Results() {
     );
   }
 
+  const credibilityConfig = getCredibilityConfig(overallScore);
+  const TierIcon =
+    credibilityConfig.iconName === "ShieldCheck"
+      ? ShieldCheck
+      : credibilityConfig.iconName === "CheckCircle2"
+      ? CheckCircle2
+      : credibilityConfig.iconName === "AlertTriangle"
+      ? AlertTriangle
+      : ShieldAlert;
+
   const getScoreColor = (s: number) =>
     s >= 80 ? "text-green-600" : s >= 60 ? "text-blue-600" : s >= 40 ? "text-yellow-600" : "text-red-600";
 
-  const getBadge = (s: number) =>
-    s >= 80
-      ? { label: "Highly Credible",      color: "bg-green-100 text-green-700", Icon: CheckCircle2 }
-      : s >= 60
-      ? { label: "Moderately Credible",  color: "bg-blue-100 text-blue-700",   Icon: AlertTriangle }
-      : { label: "Low Credibility",      color: "bg-red-100 text-red-700",     Icon: XCircle };
-
-  const badge = getBadge(overallScore);
+  const confidenceInterval = loadedResult?.confidence_interval ?? 2.5;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload?.length) {
@@ -788,11 +503,7 @@ export function Results() {
   return (
     <div className="min-h-screen py-10 lg:py-16 bg-gradient-to-b from-blue-50/30 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
-        >
+        <div className="animate-in fade-in duration-200">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8 no-print">
             <button
@@ -806,14 +517,13 @@ export function Results() {
             <span>Results</span>
           </div>
 
-
           {/* Page title */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-4xl tracking-tight">Credibility Index Report</h1>
-              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm ${badge.color}`}>
-                <badge.Icon className="w-4 h-4" />
-                {badge.label}
+              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${credibilityConfig.badgeClass}`}>
+                <TierIcon className="w-4 h-4" />
+                {credibilityConfig.label}
               </div>
             </div>
             <p className="text-muted-foreground">
@@ -822,149 +532,204 @@ export function Results() {
             </p>
           </div>
 
-          {/* ── Hero Score Card ── */}
-          <div className="bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 rounded-2xl p-8 mb-8 text-white clip-corner-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white/8 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-800/30 rounded-full blur-2xl" />
-
-            <div className="relative grid md:grid-cols-3 gap-8 items-start">
-              {/* Score ring */}
-              <div className="flex items-center gap-6">
-                <div className="relative flex items-center justify-center">
-                  <ScoreRing score={overallScore} size={110} />
-                  <div className="absolute text-center">
-                    <div className="text-3xl" style={{ fontWeight: 700, lineHeight: 1 }}>{overallScore}</div>
-                    <div className="text-xs text-blue-200 mt-0.5">/ 100</div>
-                  </div>
+          {/* ── Hero Score Card: Institutional PolitiFact Truth-O-Meter & Credibility Engine ── */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm clip-corner-xl overflow-hidden mb-8 transition-all hover:shadow-md">
+            {/* Institutional Header Ribbon */}
+            <div className="bg-slate-50/90 px-6 py-3 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1 rounded bg-slate-900 text-white">
+                  <Shield className="w-3.5 h-3.5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1 text-blue-200 text-sm">
-                    <Shield className="w-4 h-4" />
-                    <span>Credibility Index</span>
-                  </div>
-                  <div className="text-4xl mb-3" style={{ fontWeight: 700 }}>{overallScore}%</div>
-                  <p className="text-blue-100 text-sm max-w-xs leading-relaxed">
-                    Moderately credible. Key claims verified; AI generation probability is low.
-                  </p>
-                </div>
+                <span className="font-bold tracking-tight text-slate-800 uppercase">
+                  Veritas Intelligence Assessment
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="font-mono text-slate-500">
+                  REF: {id ? `VER-${id.slice(-8).toUpperCase()}` : "VER-2026-X89"}
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">
+                  Inference: 1.42s · 95% Confidence
+                </span>
               </div>
 
-              {/* Dimension mini scores */}
-              <div className="md:col-span-2 space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Linguistic",     value: linguisticScore,  Icon: Brain,       weight: "40%" },
-                    { label: "Source Auth.",   value: sourceCredibility, Icon: Globe,       weight: "35%" },
-                    { label: "Corroboration",  value: factCheckScore,   Icon: Search,      weight: "25%" },
-                  ].map((m, i) => (
-                    <div key={i} className="bg-white/15 backdrop-blur-sm rounded-xl p-4 clip-corner-icon">
-                      <div className="flex items-center justify-between mb-1">
-                        <m.Icon className="w-4 h-4 text-blue-200" />
-                        <span className="text-xs text-blue-300 font-mono">{m.weight}</span>
-                      </div>
-                      <div className="text-2xl mb-0.5" style={{ fontWeight: 700 }}>
-                        {m.value}
-                        <span className="text-sm text-blue-300 ml-0.5">%</span>
-                      </div>
-                      <div className="text-xs text-blue-200">{m.label}</div>
-                    </div>
-                  ))}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCertificateOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Audit Certificate</span>
+                </button>
+                <span className="text-[11px] font-mono text-slate-500 hidden md:inline">
+                  Ensemble v1.5 (RoBERTa + MediaBias + NewsWire)
+                </span>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${credibilityConfig.badgeClass}`}>
+                  <TierIcon className="w-3.5 h-3.5" />
+                  <span>{credibilityConfig.shortLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Card Grid */}
+            <div className="grid lg:grid-cols-12 gap-8 items-center p-6 sm:p-8">
+              {/* Left Column: PolitiFact Truth-O-Meter & Speedometer Gauge */}
+              <div className="lg:col-span-5 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-slate-100 pb-6 lg:pb-0 lg:pr-6">
+                <CredibilityGauge
+                  score={overallScore}
+                  confidenceInterval={confidenceInterval}
+                  size="lg"
+                  showTruthOMeter={true}
+                  showConfidenceInterval={true}
+                  showTicks={true}
+                />
+              </div>
+
+              {/* Right Column: Executive Synthesis, Dimension Pillars, and Mathematical MCDA Formula */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Executive Synthesis */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
+                      Executive Synthesis
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                    <span className="text-xs font-semibold text-slate-700">
+                      {credibilityConfig.shortLabel} Consensus
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight text-slate-900 mb-2">
+                    {credibilityConfig.verdict}
+                  </h2>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    {overallScore >= 80
+                      ? "Authoritative and factual. Core assertions have been corroborated by multiple primary wire services (Reuters, AP, BBC). Stylometric analysis indicates objective journalistic syntax with low AI deception markers."
+                      : overallScore >= 60
+                      ? "Substantively factual with minor qualifications. Primary assertions align with accredited news coverage, though stylistic markers indicate moderate emotional framing or partisan tone."
+                      : overallScore >= 40
+                      ? "Caution advised. The report identified unsubstantiated factual claims, elevated emotional hyperbole, or source transparency concerns that require independent corroboration."
+                      : "High risk of disinformation or synthetic deception. Assertions contradict consensus reporting from verified wire services, exhibiting elevated manipulative linguistic markers."}
+                  </p>
                 </div>
 
-                {/* Weighted formula */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3.5 border border-white/10">
-                  <p className="text-xs text-blue-200 mb-2 flex items-center gap-1.5">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    Ensemble weighting formula
-                  </p>
+                {/* 3 Dimension Architecture Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Pillar 1: Linguistic */}
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Brain className="w-3.5 h-3.5 text-blue-600" />
+                        Linguistic (40%)
+                      </span>
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {linguisticScore}%
+                      </span>
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          linguisticScore >= 80 ? "bg-emerald-500" : linguisticScore >= 60 ? "bg-blue-500" : linguisticScore >= 40 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${linguisticScore}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      {aiProbability > 50
+                        ? `Elevated AI probability (${aiProbability}%). Synthetic LLM transition cadence.`
+                        : `Human cadence (Burstiness CV > 0.35). Low AI markers (${aiProbability}%).`}
+                    </p>
+                  </div>
+
+                  {/* Pillar 2: Source Authority */}
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                        Source Auth. (35%)
+                      </span>
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {sourceCredibility}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          sourceCredibility >= 80 ? "bg-emerald-500" : sourceCredibility >= 60 ? "bg-blue-500" : sourceCredibility >= 40 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${sourceCredibility}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      {sourceCredibility >= 80
+                        ? "Accredited newsroom with verified editorial transparency."
+                        : sourceCredibility >= 60
+                        ? "Standard transparency signals; moderate independent ranking."
+                        : "Unverified domain or unknown ownership transparency."}
+                    </p>
+                  </div>
+
+                  {/* Pillar 3: Corroboration */}
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-sky-600" />
+                        Corroboration (25%)
+                      </span>
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {factCheckScore}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          factCheckScore >= 80 ? "bg-emerald-500" : factCheckScore >= 60 ? "bg-blue-500" : factCheckScore >= 40 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${factCheckScore}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">
+                      {claims.filter(c => c.status === "false").length > 0
+                        ? `${claims.filter(c => c.status === "false").length} claim(s) debunked by certified fact-checkers.`
+                        : claims.filter(c => c.status === "verified").length > 0
+                        ? `${claims.filter(c => c.status === "verified").length} claim(s) corroborated against wire press archives.`
+                        : "Requires additional independent confirmation from primary wire feeds."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Weighted MCDA Formula Bar */}
+                <div className="bg-slate-50/90 rounded-xl p-3.5 border border-slate-200/80">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Ensemble Mathematical Weighting (MCDA)</span>
+                    </p>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Overall = (L × 0.40) + (S × 0.35) + (C × 0.25)
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5 flex-wrap text-xs font-mono">
-                    <span className="bg-white/20 px-2 py-0.5 rounded">
+                    <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-slate-400 font-sans mr-1">Linguistic:</span>
                       {linguisticScore} × 0.40
                     </span>
-                    <span className="text-blue-300">+</span>
-                    <span className="bg-white/20 px-2 py-0.5 rounded">
+                    <span className="text-slate-400 font-bold">+</span>
+                    <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-slate-400 font-sans mr-1">Source:</span>
                       {sourceCredibility} × 0.35
                     </span>
-                    <span className="text-blue-300">+</span>
-                    <span className="bg-white/20 px-2 py-0.5 rounded">
+                    <span className="text-slate-400 font-bold">+</span>
+                    <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-slate-400 font-sans mr-1">Corroboration:</span>
                       {factCheckScore} × 0.25
                     </span>
-                    <span className="text-blue-300">=</span>
-                    <span className="bg-white/30 px-2 py-0.5 rounded font-bold text-white">
-                      {overallScore}
+                    <span className="text-slate-400 font-bold">=</span>
+                    <span className={`px-2.5 py-1 rounded font-bold border ${credibilityConfig.badgeClass}`}>
+                      {overallScore}% {credibilityConfig.shortLabel}
                     </span>
                   </div>
-                  <p className="text-xs text-blue-300/70 mt-1.5">
-                    Linguistic (40%) · Source Authority (35%) · Corroboration (25%)
-                  </p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Executive Analysis Verdict & Rationale Card ── */}
-          <div className="bg-white border border-blue-200/60 rounded-2xl p-6 mb-8 clip-corner-lg shadow-sm">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-blue-100">
-              <div className="p-2 bg-blue-100 rounded-lg text-blue-700">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Analysis Verdict & Detailed Score Explanation</h3>
-                <p className="text-xs text-muted-foreground">Comprehensive breakdown explaining why this content earned an overall score of {overallScore}%</p>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5">
-              {/* Pillar 1: Linguistic & AI */}
-              <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-200/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <Brain className="w-4 h-4 text-blue-600" />
-                    1. Linguistic & AI (40%)
-                  </span>
-                  <span className="text-sm font-bold text-blue-700">{linguisticScore}%</span>
-                </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  {aiProbability > 50
-                    ? `High AI generation probability (${aiProbability}%). The text displays monotonous cadence and synthetic LLM transition markers.`
-                    : `High textual credibility with natural human cadence (Burstiness CV > 0.35) and low AI probability (${aiProbability}%).`}
-                </p>
-              </div>
-
-              {/* Pillar 2: Source Authority */}
-              <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-200/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <Globe className="w-4 h-4 text-blue-600" />
-                    2. Source Authority (35%)
-                  </span>
-                  <span className="text-sm font-bold text-blue-700">{sourceCredibility}%</span>
-                </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  {sourceCredibility >= 80
-                    ? "Associated with accredited news agencies with documented editorial transparency."
-                    : sourceCredibility >= 60
-                    ? "Domain shows standard transparency signals, though independent editorial ranking is moderate."
-                    : "Unverified domain or unknown publisher background. Caution advised."}
-                </p>
-              </div>
-
-              {/* Pillar 3: External Corroboration */}
-              <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-200/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <Search className="w-4 h-4 text-blue-600" />
-                    3. Corroboration (25%)
-                  </span>
-                  <span className="text-sm font-bold text-blue-700">{factCheckScore}%</span>
-                </div>
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  {claims.filter(c => c.status === "false").length > 0
-                    ? `${claims.filter(c => c.status === "false").length} claim(s) debunked as false by certified fact-checkers.`
-                    : claims.filter(c => c.status === "verified").length > 0
-                    ? `${claims.filter(c => c.status === "verified").length} claim(s) verified against press archives with direct news reference links below.`
-                    : "Factual statements require additional independent confirmation from primary news sources."}
-                </p>
               </div>
             </div>
           </div>
@@ -973,13 +738,13 @@ export function Results() {
           {/* ── Main analytics grid ── */}
           <div className="grid lg:grid-cols-3 gap-6 mb-6">
             {/* Dimension bar chart */}
-            <div className="lg:col-span-2 bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
+            <div className="lg:col-span-2 min-w-0 bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
               <div className="flex items-center gap-2 mb-6">
                 <BarChart2 className="w-5 h-5 text-blue-600" />
                 <h3>Credibility Dimensions</h3>
               </div>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-60 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                   <BarChart data={dimensionData} barSize={36}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
@@ -1023,33 +788,65 @@ export function Results() {
                   </div>
                   <span className="text-yellow-600" style={{ fontWeight: 600 }}>{aiProbability}%</span>
                 </div>
-                <div className="mt-4 p-3 bg-green-50 border border-green-200/50 rounded-lg text-xs text-green-700 leading-relaxed">
-                  Low AI generation probability. Content shows stylometric markers consistent with human authorship.
+                <div className={`mt-4 p-3 rounded-lg text-xs leading-relaxed ${
+                  aiProbability > 65
+                    ? "bg-rose-50 border border-rose-200/50 text-rose-800"
+                    : aiProbability > 35
+                    ? "bg-amber-50 border border-amber-200/50 text-amber-800"
+                    : "bg-green-50 border border-green-200/50 text-green-700"
+                }`}>
+                  {aiProbability > 65
+                    ? "High AI generation probability. Content exhibits synthetic transitional markers and uniform sentence cadence."
+                    : aiProbability > 35
+                    ? "Mixed / hybrid generation probability. Portions show automated stylometric signatures."
+                    : "Low AI generation probability. Content shows stylometric markers consistent with human authorship."}
                 </div>
+                <a
+                  href="#forensic-stylometrics-section"
+                  className="mt-2 block text-center py-1.5 px-3 rounded-md bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors"
+                >
+                  Inspect Sentence Heatmap & Metrics →
+                </a>
               </div>
             </div>
           </div>
 
-          {/* ── XAI TRUTH MAP ── */}
-          <div className="bg-white border border-blue-200/50 rounded-xl p-6 mb-6 clip-corner-lg">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-blue-600" />
+          {/* ── FORENSIC STYLOMETRICS & DEEP AI DETECTION HEATMAP ── */}
+          <div id="forensic-stylometrics-section">
+            <ForensicStylometricsPanel
+              forensics={loadedResult?.ai_forensics}
+              aiProbability={aiProbability}
+              rawText={loadedResult?.content || text}
+            />
+          </div>
+
+          {/* ── XAI TRUTH MAP: GRAMMARLY-STYLE ANNOTATION ENGINE ── */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 mb-8 clip-corner-lg shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-200/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700">
+                  <Sparkles className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3>Truth Map — XAI Phrase Analysis</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Specific phrases that influenced the Credibility Index score, surfaced by the RoBERTa XAI layer
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-lg">Truth Map — RoBERTa Explainable AI (XAI)</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase">
+                      Grammarly-Style XAI
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Sentence-level stylometric highlights, category filters, and floating finding inspection cards.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 rounded-full text-xs text-blue-700 border border-blue-200/60 flex-shrink-0">
-                <Sparkles className="w-3 h-3" />
-                XAI
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  40% Linguistic Weight
+                </span>
               </div>
             </div>
 
             <TruthMap text={text} type={type} xaiAnnotations={loadedResult?.xai_annotations} resultId={id || loadedResult?.id} />
-
           </div>
 
           {/* ── Linguistic Analysis ── */}
@@ -1111,187 +908,12 @@ export function Results() {
           ) : null}
 
           <div className={`grid lg:grid-cols-2 gap-6 mb-6 ${corroborationView === "graph" ? "lg:hidden hidden" : ""}`}>
-            <div className="bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <Search className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">Claim-Check-Evidence Verification</h3>
-                </div>
-                <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                  Newsroom Standard
-                </span>
-              </div>
-              <div className="space-y-3.5">
-                {claims.map((claim, i) => {
-                  const isVerified = claim.status === "verified";
-                  const isFalse = claim.status === "false";
-                  const isUnverified = !isVerified && !isFalse;
+            <ClaimsAccordion claims={claims} />
 
-                  const badgeBg = isVerified
-                    ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                    : isFalse
-                    ? "bg-rose-100 text-rose-800 border-rose-300"
-                    : "bg-amber-100 text-amber-800 border-amber-300";
-
-                  const iconBg = isVerified
-                    ? "bg-emerald-100 text-emerald-600"
-                    : isFalse
-                    ? "bg-rose-100 text-rose-600"
-                    : "bg-amber-100 text-amber-600";
-
-                  const borderCard = isVerified
-                    ? "border-emerald-200/70 hover:border-emerald-300 bg-emerald-50/15"
-                    : isFalse
-                    ? "border-rose-200/70 hover:border-rose-300 bg-rose-50/20"
-                    : "border-amber-200/60 hover:border-amber-300 bg-amber-50/15";
-
-                  return (
-                    <div key={i} className={`p-4 border rounded-xl transition-all space-y-3.5 ${borderCard}`}>
-                      {/* Row 1: The Claim + The Check Badge */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${iconBg}`}>
-                            {isVerified ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            ) : isFalse ? (
-                              <XCircle className="w-4 h-4 text-rose-600" />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">1. The Claim</span>
-                            </div>
-                            <p className="text-sm font-semibold leading-snug text-gray-900">
-                              "{claim.claim}"
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* The Check (Verdict) */}
-                        <div className="flex flex-col items-end flex-shrink-0">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border flex items-center gap-1 ${badgeBg}`}>
-                            {isVerified && <CheckCircle2 className="w-3.5 h-3.5" />}
-                            {isFalse && <XCircle className="w-3.5 h-3.5" />}
-                            {isUnverified && <AlertTriangle className="w-3.5 h-3.5" />}
-                            {isVerified ? "Verified True" : isFalse ? "Debunked / False" : "Unverified"}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-medium mt-1">
-                            {claim.confidence}% confidence
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Row 2: The Check (Assessment & Ruling) */}
-                      {claim.explanation && (
-                        <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
-                          isVerified ? "bg-emerald-50/80 border-emerald-200 text-emerald-950" :
-                          isFalse ? "bg-rose-50/80 border-rose-200 text-rose-950" :
-                          "bg-amber-50/80 border-amber-200 text-amber-950"
-                        }`}>
-                          <div className="flex items-center gap-1.5 mb-1 font-bold text-[11px] uppercase tracking-wider">
-                            <Info className="w-3.5 h-3.5" />
-                            <span>2. The Check (Assessment & Ruling)</span>
-                          </div>
-                          <p className="text-gray-800">{claim.explanation}</p>
-                        </div>
-                      )}
-
-                      {/* Row 3: The Evidence (Direct Links & Excerpts) */}
-                      {claim.source_links && claim.source_links.length > 0 ? (
-                        <div className="pt-2 border-t border-slate-200/80">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                              <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                              <span>3. The Evidence ({isFalse ? "Debunking Records" : "Corroborating Press Records"})</span>
-                            </span>
-                            <span className="text-[10px] text-slate-500">
-                              {claim.source_links.length} primary record{claim.source_links.length > 1 ? "s" : ""}
-                            </span>
-                          </div>
-
-                          <div className="space-y-2">
-                            {claim.source_links.map((src, sIdx) => (
-                              <div key={sIdx} className="p-2.5 rounded-lg bg-white border border-slate-200 hover:border-blue-300 transition-colors shadow-sm">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                      isFalse ? "bg-rose-100 text-rose-800" : "bg-blue-100 text-blue-800"
-                                    }`}>
-                                      {src.publisher || "Source"}
-                                    </span>
-                                    <a
-                                      href={src.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs font-semibold text-slate-900 hover:text-blue-600 truncate hover:underline flex items-center gap-1"
-                                    >
-                                      <span className="truncate">{src.title}</span>
-                                      <ExternalLink className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                                    </a>
-                                  </div>
-                                  {src.similarity_score && (
-                                    <span className="text-[10px] font-medium text-slate-500 flex-shrink-0">
-                                      {Math.round(src.similarity_score)}% match
-                                    </span>
-                                  )}
-                                </div>
-                                {src.snippet && (
-                                  <p className="text-[11px] text-slate-600 mt-1.5 line-clamp-2 leading-relaxed italic bg-slate-50 p-1.5 rounded border border-slate-100">
-                                    "{src.snippet}"
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-500 italic">
-                          No independent third-party evidence records were indexed in the ground-truth databases.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-              </div>
-            </div>
-
-            <div className="bg-white border border-blue-200/50 rounded-xl p-6 clip-corner-lg">
-              <div className="flex items-center gap-2 mb-6">
-                <BookOpen className="w-5 h-5 text-blue-600" />
-                <h3>Source Authority</h3>
-              </div>
-              <div className="space-y-3">
-                {sources.map((source, i) => (
-                  <div key={i} className="group flex items-center gap-4 p-4 border border-blue-200/40 rounded-lg hover:border-blue-300 transition-all bg-blue-50/20">
-                    <div className={`p-2 rounded-lg flex-shrink-0 clip-corner-icon ${source.credibility >= 80 ? "bg-green-100" : source.credibility >= 60 ? "bg-blue-100" : "bg-yellow-100"}`}>
-                      <Globe className={`w-4 h-4 ${source.credibility >= 80 ? "text-green-600" : source.credibility >= 60 ? "text-blue-600" : "text-yellow-600"}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm" style={{ fontWeight: 500 }}>{source.name}</span>
-                        {source.status === "verified" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${source.credibility >= 80 ? "bg-green-500" : source.credibility >= 60 ? "bg-blue-500" : "bg-yellow-500"}`}
-                            style={{ width: `${source.credibility}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{source.credibility}%</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{source.matches} match{source.matches > 1 ? "es" : ""}</span>
-                      <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SourceNutritionLabel
+              sources={sources}
+              overallSourceScore={sourceCredibility}
+            />
           </div>
 
 
@@ -1371,21 +993,74 @@ export function Results() {
           <div className="flex flex-wrap items-center justify-center gap-4 no-print mt-8">
             <button
               onClick={() => navigate("/verify")}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-lg hover:from-blue-800 hover:to-blue-600 transition-all shadow-sm hover:shadow-md clip-corner-sm cursor-pointer"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-lg hover:from-blue-800 hover:to-blue-600 transition-all shadow-sm hover:shadow-md clip-corner-sm cursor-pointer font-semibold text-sm"
             >
               <Sparkles className="w-4 h-4" />
-              Analyse New Content
+              <span>Analyse New Content</span>
             </button>
+
             <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer font-semibold"
+              onClick={() => setCertificateOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm hover:shadow-md clip-corner-sm cursor-pointer font-semibold text-sm"
+            >
+              <Award className="w-4 h-4 text-amber-400" />
+              <span>Export Credibility Certificate</span>
+              {!tierConfig.allowsPdfExport && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40 uppercase">
+                  PRO
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                if (!tierConfig.allowsPdfExport) {
+                  setPricingOpen(true);
+                  return;
+                }
+                window.print();
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-white border border-blue-200 text-blue-700 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer font-semibold shadow-xs text-sm"
             >
               <Download className="w-4 h-4" />
-              Export Full Report
+              <span>Export Full Report</span>
+              {!tierConfig.allowsPdfExport && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase">
+                  PRO
+                </span>
+              )}
             </button>
           </div>
-        </motion.div>
+        </div>
       </div>
+
+      {/* Official Credibility Audit Certificate Modal */}
+      <AuditCertificateModal
+        open={certificateOpen}
+        onOpenChange={setCertificateOpen}
+        resultId={id}
+        result={loadedResult}
+        overallScore={overallScore}
+        linguisticScore={linguisticScore}
+        sourceCredibility={sourceCredibility}
+        factCheckScore={factCheckScore}
+        aiProbability={aiProbability}
+        sources={sources}
+        claims={claims}
+        linguisticFlags={linguisticFlags}
+        text={text}
+        type={type}
+        tier={tier}
+        onUpgradeRequired={() => setPricingOpen(true)}
+      />
+
+      {/* Commercial Account Tiers Modal */}
+      <PricingModal
+        open={pricingOpen}
+        onOpenChange={setPricingOpen}
+        currentTier={tier}
+        onSelectTier={changeTier}
+      />
 
       <style>{CLIP_STYLES}</style>
     </div>

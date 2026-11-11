@@ -60,6 +60,7 @@ KNOWN_SOURCES = {
     "cbc.ca": {"name": "CBC News", "credibility": 89.0, "status": "verified"},
 
     # ── South African & Regional African Media (85–92) ──
+    "enca.com": {"name": "eNCA (e.tv News & Current Affairs)", "credibility": 89.0, "status": "verified"},
     "news24.com": {"name": "News24", "credibility": 89.0, "status": "verified"},
     "dailymaverick.co.za": {"name": "Daily Maverick", "credibility": 91.0, "status": "verified"},
     "mg.co.za": {"name": "Mail & Guardian", "credibility": 90.0, "status": "verified"},
@@ -88,6 +89,11 @@ KNOWN_SOURCES = {
     "scientificamerican.com": {"name": "Scientific American", "credibility": 94.0, "status": "verified"},
     "arstechnica.com": {"name": "Ars Technica", "credibility": 92.0, "status": "verified"},
     "wired.com": {"name": "Wired", "credibility": 90.0, "status": "verified"},
+
+    # ── Authoritative Knowledge Bases & Encyclopedias (90–95) ──
+    "wikipedia.org": {"name": "Wikipedia Knowledge Base", "credibility": 90.0, "status": "verified"},
+    "en.wikipedia.org": {"name": "Wikipedia Knowledge Base", "credibility": 90.0, "status": "verified"},
+    "britannica.com": {"name": "Encyclopaedia Britannica", "credibility": 95.0, "status": "verified"},
 
     # ── Policy Think Tanks & Research Institutes (92–96) ──
     "rand.org": {"name": "RAND Corporation", "credibility": 94.0, "status": "verified"},
@@ -128,6 +134,7 @@ KNOWN_SOURCES = {
     "the guardian": {"name": "The Guardian", "credibility": 89.0, "status": "verified"},
     "financial times": {"name": "Financial Times", "credibility": 92.0, "status": "verified"},
     "daily maverick": {"name": "Daily Maverick", "credibility": 91.0, "status": "verified"},
+    "enca": {"name": "eNCA", "credibility": 89.0, "status": "verified"},
     "news24": {"name": "News24", "credibility": 89.0, "status": "verified"},
     "mail & guardian": {"name": "Mail & Guardian", "credibility": 90.0, "status": "verified"},
     "business day": {"name": "Business Day", "credibility": 89.0, "status": "verified"},
@@ -145,6 +152,8 @@ KNOWN_SOURCES = {
     "natural news": {"name": "Natural News", "credibility": 12.0, "status": "questionable"},
     "the onion": {"name": "The Onion", "credibility": 20.0, "status": "questionable"},
     "babylon bee": {"name": "The Babylon Bee", "credibility": 20.0, "status": "questionable"},
+    "wikipedia": {"name": "Wikipedia Knowledge Base", "credibility": 90.0, "status": "verified"},
+    "britannica": {"name": "Encyclopaedia Britannica", "credibility": 95.0, "status": "verified"},
 }
 
 

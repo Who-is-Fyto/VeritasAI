@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { veritasAPI } from "../services/api";
 import { resolveAffiliation } from "../utils/affiliation";
+import { AccountTier, resolveTier } from "../utils/tierLimits";
 
 export interface User {
   id: string;
@@ -10,7 +11,8 @@ export interface User {
   role?: string;
   institution?: string;
   student_id?: string;
-  account_type?: "academic" | "enterprise" | "base";
+  account_type?: "academic" | "enterprise" | "base" | "pro" | "free";
+  tier?: AccountTier;
 }
 
 interface AuthContextType {
@@ -18,9 +20,17 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   isLoggedIn: boolean;
-  login: (credentials: any) => Promise<void>;
+  tier: AccountTier;
+  login: (credentials: any) => Promise<{ requiresOtp?: boolean; email?: string; devOtp?: string | null }>;
+  loginVerifyOtp: (email: string, otp: string) => Promise<void>;
+  signupRequestOtp: (payload: any) => Promise<{ status: string; message: string; email: string; dev_otp?: string | null }>;
+  signupVerifyOtp: (email: string, otp: string) => Promise<void>;
+  resendOtp: (email: string, purpose: "signup" | "login" | "forgot_password") => Promise<{ status: string; message: string; dev_otp?: string | null }>;
+  forgotPasswordRequestOtp: (email: string) => Promise<{ status: string; message: string; email: string; dev_otp?: string | null }>;
+  forgotPasswordReset: (email: string, otp: string, newPassword: string) => Promise<{ status: string; message: string }>;
   register: (payload: any) => Promise<void>;
   updateProfile: (payload: any) => Promise<void>;
+  changeTier: (tier: AccountTier) => Promise<void>;
   logout: () => void;
 }
 
@@ -31,14 +41,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const currentTier = resolveTier(user);
+
   useEffect(() => {
     // 1. Initialise auth state from localStorage
     const savedToken = localStorage.getItem("veritas_token");
     const savedUser = localStorage.getItem("veritas_user");
 
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        setToken(savedToken);
+        setUser(parsed);
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+      }
       
       if (import.meta.env.VITE_USE_MOCK_API !== "false") {
         setLoading(false);
@@ -63,30 +80,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (credentials: any) => {
+  const login = async (credentials: any): Promise<{ requiresOtp?: boolean; email?: string; devOtp?: string | null }> => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const email = (credentials.email || "").trim().toLowerCase();
+      const isSuperAdmin = email.includes("superadmin") || email === "admin@veritas.ai";
       const aff = resolveAffiliation(credentials.email);
+      const tier: AccountTier = isSuperAdmin
+        ? "superadmin"
+        : aff.accountType === "academic"
+        ? "academic"
+        : aff.accountType === "enterprise"
+        ? "pro"
+        : "free";
+
       const mockUser: User = {
-        id: "mock-user-123",
+        id: isSuperAdmin ? "admin-1" : "mock-user-123",
         email: credentials.email,
-        name: credentials.email.split("@")[0],
+        name: isSuperAdmin ? "VeritasAI Super Administrator" : (credentials.name || credentials.email.split("@")[0]),
         joined_at: new Date().toISOString(),
-        institution: aff.institution,
-        role: aff.role,
+        institution: isSuperAdmin ? "VeritasAI Governance Directorate" : aff.institution,
+        role: isSuperAdmin ? "superadmin" : aff.role,
         student_id: aff.studentId || undefined,
-        account_type: aff.accountType,
+        account_type: isSuperAdmin ? "enterprise" : aff.accountType,
+        tier,
       };
       setToken("mock-token-abc");
       setUser(mockUser);
       localStorage.setItem("veritas_token", "mock-token-abc");
       localStorage.setItem("veritas_user", JSON.stringify(mockUser));
       setLoading(false);
-      return;
+      return { requiresOtp: false };
     }
 
     try {
       const data = await veritasAPI.login(credentials);
+      if (data.requires_otp) {
+        return {
+          requiresOtp: true,
+          email: data.email || credentials.email,
+          devOtp: data.dev_otp
+        };
+      }
+      setToken(data.access_token);
+      setUser(data.user);
+      if (data.access_token) {
+        localStorage.setItem("veritas_token", data.access_token);
+      }
+      if (data.user) {
+        localStorage.setItem("veritas_user", JSON.stringify(data.user));
+      }
+      return { requiresOtp: false };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginVerifyOtp = async (email: string, otp: string) => {
+    setLoading(true);
+    try {
+      const data = await veritasAPI.loginVerifyOtp(email, otp);
       setToken(data.access_token);
       setUser(data.user);
       localStorage.setItem("veritas_token", data.access_token);
@@ -96,19 +149,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signupRequestOtp = async (payload: any) => {
+    return await veritasAPI.signupRequestOtp(payload);
+  };
+
+  const signupVerifyOtp = async (email: string, otp: string) => {
+    setLoading(true);
+    try {
+      const data = await veritasAPI.signupVerifyOtp(email, otp);
+      setToken(data.access_token);
+      setUser(data.user);
+      localStorage.setItem("veritas_token", data.access_token);
+      localStorage.setItem("veritas_user", JSON.stringify(data.user));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendOtp = async (email: string, purpose: "signup" | "login" | "forgot_password") => {
+    return await veritasAPI.resendOtp(email, purpose);
+  };
+
+  const forgotPasswordRequestOtp = async (email: string) => {
+    return await veritasAPI.forgotPasswordRequestOtp(email);
+  };
+
+  const forgotPasswordReset = async (email: string, otp: string, newPassword: string) => {
+    return await veritasAPI.forgotPasswordReset(email, otp, newPassword);
+  };
+
   const register = async (payload: any) => {
     setLoading(true);
     if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const email = (payload.email || "").trim().toLowerCase();
+      const isSuperAdmin = email.includes("superadmin") || email === "admin@veritas.ai";
       const aff = resolveAffiliation(payload.email);
+      const tier: AccountTier = isSuperAdmin
+        ? "superadmin"
+        : aff.accountType === "academic"
+        ? "academic"
+        : aff.accountType === "enterprise"
+        ? "pro"
+        : "free";
+
       const mockUser: User = {
-        id: "mock-user-123",
+        id: isSuperAdmin ? "admin-1" : "mock-user-123",
         email: payload.email,
-        name: payload.name,
+        name: isSuperAdmin ? "VeritasAI Super Administrator" : payload.name,
         joined_at: new Date().toISOString(),
-        institution: payload.institution || aff.institution,
-        role: payload.role || aff.role,
+        institution: isSuperAdmin ? "VeritasAI Governance Directorate" : (payload.institution || aff.institution),
+        role: isSuperAdmin ? "superadmin" : (payload.role || aff.role),
         student_id: payload.student_id || aff.studentId || undefined,
-        account_type: aff.accountType,
+        account_type: isSuperAdmin ? "enterprise" : aff.accountType,
+        tier,
       };
       setToken("mock-token-abc");
       setUser(mockUser);
@@ -150,6 +243,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("veritas_user", JSON.stringify(updatedUser));
   };
 
+  const changeTier = async (newTier: AccountTier) => {
+    if (import.meta.env.VITE_USE_MOCK_API !== "false") {
+      const updated: User = {
+        ...(user || {
+          id: "mock-user-123",
+          email: "user@example.com",
+          name: "User",
+          joined_at: new Date().toISOString(),
+        }),
+        tier: newTier,
+        account_type: newTier === "academic" ? "academic" : newTier === "pro" ? "enterprise" : "base",
+      };
+      setUser(updated);
+      localStorage.setItem("veritas_user", JSON.stringify(updated));
+      return;
+    }
+
+    const updatedUser = await veritasAPI.updateTier(newTier);
+    setUser(updatedUser);
+    localStorage.setItem("veritas_user", JSON.stringify(updatedUser));
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -164,9 +279,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         loading,
         isLoggedIn: !!token,
+        tier: currentTier,
         login,
+        loginVerifyOtp,
+        signupRequestOtp,
+        signupVerifyOtp,
+        resendOtp,
+        forgotPasswordRequestOtp,
+        forgotPasswordReset,
         register,
         updateProfile,
+        changeTier,
         logout,
       }}
     >

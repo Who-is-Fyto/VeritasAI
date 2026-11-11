@@ -61,6 +61,30 @@ class WeightedScores(BaseModel):
     weights: dict[str, float]  = {"linguistic": 0.40, "source": 0.35, "corroboration": 0.25}
 
 
+class SentenceAIScore(BaseModel):
+    """Granular sentence-level AI score and forensic metrics."""
+    sentence_index: int
+    text: str
+    ai_probability: float = Field(..., ge=0, le=100)
+    classification: str   # "human" | "mixed" | "synthetic"
+    burstiness: float
+    perplexity_score: float
+    detected_markers: list[str] = []
+
+
+class ForensicStylometrics(BaseModel):
+    """Deep forensic stylometrics and token-level information entropy signals."""
+    burstiness_score: float
+    burstiness_classification: str
+    perplexity_estimate: float
+    perplexity_classification: str
+    lexical_diversity: float
+    shannon_entropy: float
+    synthetic_marker_count: int
+    synthetic_markers_found: list[str] = []
+    sentence_analyses: list[SentenceAIScore] = []
+
+
 class AnalysisResult(BaseModel):
     """Full response returned by POST /api/v1/analyse and GET /api/v1/results/:id"""
     id: str
@@ -76,6 +100,7 @@ class AnalysisResult(BaseModel):
     linguistic_flags: list[LinguisticFlag] = []
     summary: str = ""
     content: str = ""
+    ai_forensics: Optional[ForensicStylometrics] = None
 
 
 class HealthResponse(BaseModel):
@@ -83,3 +108,28 @@ class HealthResponse(BaseModel):
     version: str
     model_loaded: bool
     db_connected: bool
+
+
+class AuditCertificateResponse(BaseModel):
+    """
+    Formal academic and investigative audit certificate issued for an analysis result.
+    Conforms to ISO/IEC 23894 AI Risk Assessment and algorithmic transparency standards.
+    """
+    certificate_id: str
+    verification_id: str
+    issued_at: datetime
+    content_hash: str
+    target_summary: str
+    input_type: str
+    overall_score: float = Field(..., ge=0, le=100)
+    verdict_label: str
+    confidence_interval: float = 2.5
+    scores: WeightedScores
+    ai_probability: float = Field(..., ge=0, le=100)
+    claims_verified: int
+    claims_total: int
+    top_sources: list[str] = []
+    digital_signature: str
+    issuer: str = "VeritasAI Credibility & Forensic Attestation Authority"
+    standard: str = "ISO/IEC 23894 AI Risk Management & IEEE 7001 Algorithmic Transparency"
+    verification_url: str = ""

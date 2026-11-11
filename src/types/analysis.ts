@@ -64,6 +64,28 @@ export interface WeightedScores {
   };
 }
 
+export interface SentenceAIScore {
+  sentence_index: number;
+  text: string;
+  ai_probability: number;
+  classification: "human" | "mixed" | "synthetic";
+  burstiness: number;
+  perplexity_score: number;
+  detected_markers: string[];
+}
+
+export interface ForensicStylometrics {
+  burstiness_score: number;
+  burstiness_classification: "low_burstiness" | "moderate" | "high_burstiness";
+  perplexity_estimate: number;
+  perplexity_classification: "highly_predictable" | "moderate" | "natural_unpredictable";
+  lexical_diversity: number;
+  shannon_entropy: number;
+  synthetic_marker_count: number;
+  synthetic_markers_found: string[];
+  sentence_analyses: SentenceAIScore[];
+}
+
 /** Full analysis result returned by POST /api/v1/analyse */
 export interface AnalysisResult {
   id: string;
@@ -81,10 +103,34 @@ export interface AnalysisResult {
   linguistic_flags: LinguisticFlag[];
   /** One-sentence human-readable summary of the result */
   summary: string;
+  /** Deep AI Text Detection & Forensic Stylometrics breakdown */
+  ai_forensics?: ForensicStylometrics;
 }
 
 /** Payload for POST /api/v1/analyse */
 export interface AnalyseRequest {
   content: string;
   type: "text" | "url" | "upload";
+}
+
+/** Formal Credibility Audit Certificate */
+export interface AuditCertificateResponse {
+  certificate_id: string;
+  verification_id: string;
+  issued_at: string;
+  content_hash: string;
+  target_summary: string;
+  input_type: string;
+  overall_score: number;
+  verdict_label: string;
+  confidence_interval: number;
+  scores: WeightedScores;
+  ai_probability: number;
+  claims_verified: number;
+  claims_total: number;
+  top_sources: string[];
+  digital_signature: string;
+  issuer: string;
+  standard: string;
+  verification_url: string;
 }

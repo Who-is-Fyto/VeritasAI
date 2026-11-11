@@ -1,22 +1,60 @@
-
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Information Verification Platform</title>
-      <meta name="description" content="Verify the credibility of news and research by authenticating information from articles, tweets, and texts with a user-friendly AI-powered platform." />
-      <meta name="robots" content="noindex, nofollow" />
-      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      
-    </head>
-
-    <body>
-      
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-      
-    </body>
-  </html>
-  
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VeritasAI — Multimodal Credibility Engine</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta
+      name="description"
+      content="VeritasAI is an authoritative, multimodal credibility engine for real-time disinformation detection. Evaluates news claims using RoBERTa NLP, source authority auditing, and live wire corroboration."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      #root {
+        height: 100%;
+      }
+      code, pre, .font-mono {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; box-sizing: border-box;">
+        <div style="display: flex; flex-direction: column; align-items: center; max-width: 420px; width: 100%; text-align: center;">
+          <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.35); margin-bottom: 20px;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="m9 12 2 2 4-4"/>
+            </svg>
+          </div>
+          <h2 style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #0f172a; margin: 0 0 6px 0;">VeritasAI</h2>
+          <p style="font-size: 13px; font-weight: 500; color: #64748b; margin: 0 0 24px 0;">Multimodal Credibility & Forensic Intelligence</p>
+          <div style="width: 100%; height: 4px; background: #e2e8f0; border-radius: 9999px; overflow: hidden; position: relative;">
+            <div style="position: absolute; top: 0; left: 0; bottom: 0; width: 45%; background: linear-gradient(90deg, #1d4ed8, #3b82f6); border-radius: 9999px; animation: veritasLoader 1.4s ease-in-out infinite;"></div>
+          </div>
+          <p style="font-size: 11px; font-family: monospace; color: #94a3b8; margin: 12px 0 0 0;">Assembling neural pipeline checkpoints...</p>
+        </div>
+      </div>
+      <style>
+        @keyframes veritasLoader {
+          0% { left: -45%; }
+          50% { left: 40%; width: 55%; }
+          100% { left: 100%; }
+        }
+      </style>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -42,8 +42,29 @@ We also check if the writing style sounds like a robot or an angry Twitter bot. 
 *   **Vocabulary Richness (TTR):** Type-Token Ratio. If a text keeps repeating the same 10 words, it's either spam, poorly written clickbait, or AI-generated stuff.
 *   **Emotional Language Score:** Counts exclamation marks, all-caps strings, and hyper-sensationalist adjectives. Factual reporting is usually pretty dry, while fake news relies on emotional triggers.
 *   **Passive Voice Ratio:** AI models love passive voice. Human writers tend to use active voice. If this ratio is super high, it raises stylistic flags.
+*   **Cadence Variance & Burstiness:** Evaluates standard deviation of sentence lengths. For concise inputs ($\le 3$ sentences), the engine recognizes natural concise cadence without penalizing short factual passages.
 
-All of this happens in parallel inside `backend/app/services/linguistic.py` so the user gets their response fast!
+---
+
+## 4. Hybrid Ensemble Scoring Architecture
+
+In earlier builds, linguistic credibility was computed as a naive `min(model_score, heuristic_score)`. If either signal produced an outlier (e.g. an out-of-domain historical summary tripping an edge case in the neural classifier), the entire linguistic dimension collapsed.
+
+To resolve this, we implemented a calibrated Hybrid Ensemble in `backend/app/services/linguistic.py`:
+
+```python
+if heuristic_score >= 70.0 and model_score >= 45.0:
+    # High-confidence factual syntax: blend 70% heuristic with 30% transformer
+    credibility_score = (heuristic_score * 0.70) + (model_score * 0.30)
+elif heuristic_score <= 30.0 or model_score <= 30.0:
+    # Severe manipulation detected: retain strict minimum safety cap
+    credibility_score = min(model_score, heuristic_score)
+else:
+    # Intermediate range: balanced 50/50 blend
+    credibility_score = (model_score * 0.50) + (heuristic_score * 0.50)
+```
+
+This guarantees high stability: solid factual prose is rewarded, while genuine manipulation flags continue to enforce a strict minimum safety cap.
 
 ---
 

@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import {
   User, Shield, History, Settings, ExternalLink, BarChart2,
   FileText, LogOut, CheckCircle2, AlertTriangle, XCircle, ArrowRight,
-  Brain, Sparkles, GraduationCap, Building2, Globe, Edit3, Save, X
+  Brain, Sparkles, GraduationCap, Building2, Globe, Edit3, Save, X, Key, Zap, Lock
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import { resolveAffiliation } from "../../utils/affiliation";
+import { validateName } from "../../utils/validation";
 
 const CLIP_STYLES = `
   .clip-corner-xl {
@@ -23,11 +25,15 @@ const CLIP_STYLES = `
 `;
 
 import { veritasAPI } from "../../services/api";
+import { PricingModal } from "./PricingModal";
+import { getTierConfig } from "../../utils/tierLimits";
 
 export function Profile() {
 
   const navigate = useNavigate();
-  const { user: authUser, logout, updateProfile } = useAuth();
+  const { user: authUser, logout, updateProfile, tier, changeTier } = useAuth();
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const tierConfig = getTierConfig(tier);
   const aff = resolveAffiliation(authUser?.email, authUser);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -49,6 +55,11 @@ export function Profile() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nameVal = validateName(editName);
+    if (!nameVal.isValid) {
+      setEditError(nameVal.error || "Please enter a valid display name.");
+      return;
+    }
     setEditSaving(true);
     setEditError(null);
     try {
@@ -59,9 +70,12 @@ export function Profile() {
         student_id: editStudentId.trim() || undefined,
       });
       setIsEditingProfile(false);
+      toast.success("Profile updated successfully.");
     } catch (err: any) {
       console.error(err);
-      setEditError(err.message || "Failed to save profile changes.");
+      const msg = err.message || "Failed to save profile changes.";
+      setEditError(msg);
+      toast.error(msg);
     } finally {
       setEditSaving(false);
     }
@@ -72,6 +86,7 @@ export function Profile() {
     setEditInstitution(rawAff.institution);
     setEditRole(rawAff.role);
     setEditStudentId(rawAff.studentId || "");
+    toast.info("Profile fields reset to domain-inferred defaults.");
   };
 
   const [trainStatus, setTrainStatus] = useState<any>({
@@ -96,6 +111,7 @@ export function Profile() {
             setTrainStatus(res);
             if (res.status !== "training") {
               clearInterval(interval);
+              toast.success("Active learning cycle completed successfully.");
             }
           })
           .catch(console.error);
@@ -110,8 +126,10 @@ export function Profile() {
     try {
       await veritasAPI.triggerTraining();
       setTrainStatus((prev: any) => ({ ...prev, status: "training" }));
-    } catch (err) {
+      toast.success("Active learning cycle initiated.");
+    } catch (err: any) {
       console.error("Failed to trigger training:", err);
+      toast.error(err.message || "Failed to trigger active learning.");
     }
   };
 
@@ -131,8 +149,10 @@ export function Profile() {
       setGeneratedKey(data.api_key);
       setKeys((prev) => [...prev, data]);
       setNewKeyName("");
-    } catch (err) {
+      toast.success("Developer API key generated successfully.");
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || "Failed to generate API key.");
     }
   };
 
@@ -140,8 +160,10 @@ export function Profile() {
     try {
       await veritasAPI.deleteKey(keyId);
       setKeys((prev) => prev.filter((k) => k.id !== keyId));
-    } catch (err) {
+      toast.success("API key revoked.");
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || "Failed to revoke API key.");
     }
   };
 
@@ -223,14 +245,33 @@ export function Profile() {
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h1 className="text-3xl font-semibold tracking-tight">{user.name}</h1>
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border backdrop-blur-md shadow-sm ${
-                    user.accountType === "academic"
-                      ? "bg-indigo-500/30 text-indigo-100 border-indigo-300/40"
-                      : user.accountType === "enterprise"
+                    tier === "superadmin"
                       ? "bg-emerald-500/30 text-emerald-100 border-emerald-300/40"
+                      : tier === "admin"
+                      ? "bg-indigo-500/30 text-indigo-100 border-indigo-300/40"
+                      : tier === "academic"
+                      ? "bg-indigo-500/30 text-indigo-100 border-indigo-300/40"
+                      : tier === "pro"
+                      ? "bg-blue-400/30 text-blue-100 border-blue-200/40"
                       : "bg-white/20 text-blue-100 border-white/30"
                   }`}>
-                    {user.badgeLabel}
+                    {tierConfig.badgeLabel}
                   </span>
+                  {tier === "superadmin" || tier === "admin" ? (
+                    <Link
+                      to="/admin"
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-100 border border-emerald-300/40 transition-colors"
+                    >
+                      Admin Console
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => setPricingOpen(true)}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-colors cursor-pointer"
+                    >
+                      Change Plan
+                    </button>
+                  )}
                 </div>
                 <p className="text-blue-100 text-sm mt-1 flex items-center gap-2 flex-wrap">
                   <span>{user.role}</span>
@@ -458,7 +499,24 @@ export function Profile() {
                 </div>
               </div>
 
-              {trainStatus.status === "training" ? (
+              {!tierConfig.allowsModelRetraining ? (
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <GraduationCap className="w-6 h-6 text-indigo-600 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-900 mb-1">
+                    Academic Research Feature
+                  </p>
+                  <p className="text-xs text-slate-600 mb-3">
+                    Active learning model weights fine-tuning is restricted to Academic & Research seats.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPricingOpen(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    Activate Academic Seat
+                  </button>
+                </div>
+              ) : trainStatus.status === "training" ? (
                 <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
                   <div className="flex items-center justify-between text-sm mb-3">
                     <span className="font-medium text-blue-800">Fine-Tuning Classifier...</span>
@@ -528,58 +586,83 @@ export function Profile() {
                 </div>
               )}
 
-              {/* API Keys Table/List */}
-              <div className="space-y-3 mb-5 max-h-[220px] overflow-y-auto pr-1">
-                {keys.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-2 italic text-center">
-                    No API keys generated yet. Create one below to begin developer access.
+              {/* Feature-Gated Developer API Keys */}
+              {!tierConfig.allowsDeveloperApiKeys ? (
+                <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center my-2">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                    <Lock className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 mb-1">
+                    API Keys Require Pro or Academic Tier
                   </p>
-                ) : (
-                  keys.map((k) => (
-                    <div
-                      key={k.id}
-                      className="flex items-center justify-between p-3 bg-blue-50/20 border border-blue-100/50 rounded-lg text-xs"
-                    >
-                      <div>
-                        <span className="font-semibold text-gray-900 block">{k.name}</span>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
-                          <span>Prefix: <code className="font-mono">{k.key_prefix}...</code></span>
-                          <span>·</span>
-                          <span>Created: {new Date(k.created_at).toLocaleDateString("en-GB")}</span>
+                  <p className="text-xs text-slate-600 max-w-sm mx-auto mb-4 leading-relaxed">
+                    Developer REST API keys with high-throughput rate limits are available for Pro Journalist and Academic tiers.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPricingOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Upgrade to Pro Plan</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* API Keys Table/List */}
+                  <div className="space-y-3 mb-5 max-h-[220px] overflow-y-auto pr-1">
+                    {keys.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2 italic text-center">
+                        No API keys generated yet. Create one below to begin developer access.
+                      </p>
+                    ) : (
+                      keys.map((k) => (
+                        <div
+                          key={k.id}
+                          className="flex items-center justify-between p-3 bg-blue-50/20 border border-blue-100/50 rounded-lg text-xs"
+                        >
+                          <div>
+                            <span className="font-semibold text-gray-900 block">{k.name}</span>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                              <span>Prefix: <code className="font-mono">{k.key_prefix}...</code></span>
+                              <span>·</span>
+                              <span>Created: {new Date(k.created_at).toLocaleDateString("en-GB")}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to revoke key '${k.name}'?`)) {
+                                handleDeleteKey(k.id);
+                              }
+                            }}
+                            className="text-[10px] font-semibold text-red-600 hover:text-red-700 px-2 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors border border-red-100 cursor-pointer"
+                          >
+                            Revoke
+                          </button>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Are you sure you want to revoke key '${k.name}'?`)) {
-                            handleDeleteKey(k.id);
-                          }
-                        }}
-                        className="text-[10px] font-semibold text-red-600 hover:text-red-700 px-2 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors border border-red-100 cursor-pointer"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+                      ))
+                    )}
+                  </div>
 
-              {/* Generate Key Form */}
-              <form onSubmit={handleCreateKey} className="flex gap-2">
-                <input
-                  type="text"
-                  required
-                  value={newKeyName}
-                  onChange={(e) => setNewKeyName(e.target.value)}
-                  placeholder="e.g. Research Script Key"
-                  className="flex-1 px-3 py-2 bg-blue-50/20 border border-blue-200/50 rounded-lg text-xs outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Generate Key
-                </button>
-              </form>
+                  {/* Generate Key Form */}
+                  <form onSubmit={handleCreateKey} className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                      placeholder="e.g. Research Script Key"
+                      className="flex-1 px-3 py-2 bg-blue-50/20 border border-blue-200/50 rounded-lg text-xs outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Generate Key
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
 
             {/* API Settings / Integrations */}
@@ -717,6 +800,13 @@ export function Profile() {
           </div>
         )}
 
+        {/* Commercial Account Tiers Modal */}
+        <PricingModal
+          open={pricingOpen}
+          onOpenChange={setPricingOpen}
+          currentTier={tier}
+          onSelectTier={changeTier}
+        />
       </div>
       <style>{CLIP_STYLES}</style>
     </div>

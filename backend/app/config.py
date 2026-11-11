@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "veritasai"
 
-    # Model
-    model_path: str = "roberta-base"   # swap for fine-tuned checkpoint later
+    # Models
+    model_path: str = "roberta-base"   # sequence classification / linguistic credibility checkpoint
+    ai_detector_model_path: str = "Hello-SimpleAI/chatgpt-detector-roberta"  # fine-tuned AI detection checkpoint
+    enable_neural_ai_detector: bool = False  # opt-in neural detector; defaults to zero-storage forensic stylometrics
     device: str = "cpu"
 
     # JWT Authentication
@@ -34,6 +36,13 @@ class Settings(BaseSettings):
     news_api_key: str = ""
     google_api_key: str = ""
     google_cse_id: str = ""
+
+    # SMTP Email Configuration (e.g., Gmail SMTP with App Password)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
 
     # CORS
     cors_origins: str | list[str] = ["http://localhost:5173"]
@@ -49,6 +58,11 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_minute: int = 10
 
+    # Database Backup & Disaster Recovery
+    backup_auto_enabled: bool = True
+    backup_auto_interval_hours: int = 12
+    backup_auto_retention_count: int = 5
+    backup_secondary_dir: str = "/tmp/veritas_secondary_mirror"
 
     # Scoring weights — must sum to 1.0
     weight_linguistic: float = 0.40
